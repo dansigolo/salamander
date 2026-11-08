@@ -2,9 +2,9 @@ name: Qt port build and tests
 on:
   push:
     branches: [improvement/salamander_for_linux]
-    paths: ['port/**', 'CMakeLists.txt', '.github/workflows/qt-port.yml']
+    paths: ['port/**', 'tools/upstream_sync.py', 'tools/tests/test_upstream_sync.py', 'CMakeLists.txt', '.github/workflows/qt-port.yml']
   pull_request:
-    paths: ['port/**', 'CMakeLists.txt', '.github/workflows/qt-port.yml']
+    paths: ['port/**', 'tools/upstream_sync.py', 'tools/tests/test_upstream_sync.py', 'CMakeLists.txt', '.github/workflows/qt-port.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,30 +22,12 @@ jobs:
         run: cmake -S . -B build/qt -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build/qt --parallel 2
+      - name: Test upstream integration tooling
+        run: python3 -m unittest discover -s tools/tests -p test_upstream_sync.py -v
       - name: Test
         run: ctest --test-dir build/qt --output-on-failure --output-junit results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qt-linux-test-results
-          path: build/qt/results.xml
-  windows:
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.8.3'
-          arch: win64_msvc2022_64
-          cache: true
-      - name: Configure
-        run: cmake -S . -B build/qt -G "Visual Studio 17 2022" -A x64
-      - name: Build
-        run: cmake --build build/qt --config Debug --parallel 2
-      - name: Test
-        run: ctest --test-dir build/qt -C Debug --output-on-failure --output-junit results.xml
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: qt-windows-test-results
           path: build/qt/results.xml

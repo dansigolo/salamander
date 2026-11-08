@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "remote": "upstream",
+  "url": "https://github.com/OpenSalamander/salamander.git",
+  "branch": "main",
+  "integrated_commit": "a201fa3cc708c74dc1f4eea7032e0758840447a1",
+  "extractions": [
+    {
+      "source": "src/masks.cpp",
+      "destination": "port/core/mask.cpp",
+      "note": "Mask normalization only; review upstream changes manually."
+    }
+  ]
+}

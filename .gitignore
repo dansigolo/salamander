@@ -16,3 +16,6 @@ Thumbs.db
 
 # Experimental CMake port build
 /build/
+
+# Local Python test caches
+__pycache__/

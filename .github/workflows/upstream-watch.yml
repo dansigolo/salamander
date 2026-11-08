@@ -1,0 +1,29 @@
+name: Upstream change report
+on:
+  push:
+    branches: [improvement/salamander_for_linux, main]
+    paths: ['.upstream-sync.json', 'tools/upstream_sync.py', '.github/workflows/upstream-watch.yml']
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: upstream-watch-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch upstream and generate review report
+        run: |
+          git remote add upstream https://github.com/OpenSalamander/salamander.git
+          python3 tools/upstream_sync.py check --fetch --output build/upstream-report.md
+          cat build/upstream-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-change-report
+          path: build/upstream-report.md

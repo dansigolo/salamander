@@ -1,11 +1,12 @@
 # Native Qt port: initial architecture and roadmap
 
-Status: experimental native Windows/Linux Qt port. Altap Salamander 4.0 x64 is the functional and visual target, confirmed by the user on 2026-11-07. The Open Salamander source is the technical reference. Full parity is not yet implemented; see [PARITY.md](PARITY.md).
+Status: experimental native Linux Qt port. Altap Salamander 4.0 x64 is the functional and visual target, confirmed by the user on 2026-11-07. The Open Salamander source is the technical reference. Full parity is not yet implemented; see [PARITY.md](PARITY.md).
 
 ## Decisions
 
 - C++17, Qt 6 Widgets (minimum 6.4), CMake 3.21 and Ninja.
-- Support Windows x64 and Linux x64 from one Qt codebase. Develop locally on Linux Mint 22.3 / Ubuntu 24.04. Test Windows through CI; validate X11 and Wayland separately.
+- Target Linux x64 first, developing on Linux Mint 22.3 / Ubuntu 24.04. Windows is maintained by the official upstream. Keep platform boundaries clean without promising a Windows release from this fork. Validate X11 and Wayland separately.
+- Track and integrate upstream source history with `.upstream-sync.json` and `tools/upstream_sync.py`; review extracted algorithms and port behavior independently. Linux improvements may advance beyond upstream features.
 - Incrementally extract reusable algorithms rather than replacing all code or emulating WinAPI.
 - Keep the Visual Studio build untouched. The root CMake project builds only the experimental port.
 - Core algorithms in `port/core/`, Widgets presentation in `port/qt/`, tests in `port/tests/`.
@@ -27,7 +28,7 @@ The UI is newly implemented. The first bootstrap was manually accepted on Linux 
 2. Behavioral baseline: inventory shortcuts, selection, sorting, quick search and dialogs against Windows Salamander; record Linux equivalences and add regression tests. Introduce a panel controller and reusable filesystem provider only as needed.
 3. Safe local operations: copy, move, rename, mkdir and trash through a background operation service. Define overwrite decisions, partial failures, cancellation, permissions, symlinks, hard links and cross-filesystem moves before implementing destructive commands. Test only inside temporary fixtures.
 4. Core features: search, viewer, masks, archives and persistent settings. Profile large directories and slow/network storage.
-5. Extensions and distribution: classify each plugin, implement portable equivalents, test X11/Wayland and another distribution, add CI and packaging. Validate the original Windows build on a Windows runner.
+5. Extensions and distribution: classify each plugin, implement portable equivalents, test X11/Wayland and another distribution, add CI and packaging. Compare Linux behavior with the upstream reference and review platform-specific exceptions.
 
 Full Linux parity requires an explicit feature matrix. Windows-only facilities (Registry, COM, shell extensions, NTFS-specific features) require individual decisions. No completion date is estimated yet.
 
@@ -60,18 +61,9 @@ Tests use the offscreen Qt platform; they do not validate actual X11/Wayland ren
 - Unicode directory names, symlink navigation, large directories, inaccessible paths and disconnected mounts need additional coverage.
 - Appearance, focus and shortcuts need manual checks in X11 and Wayland.
 
-## Windows Qt build
+## Upstream relationship
 
-Install Visual Studio 2022 C++ tools, CMake and an MSVC x64 build of Qt >= 6.4. Set `CMAKE_PREFIX_PATH` to that Qt installation. For example, from a developer PowerShell:
-
-```powershell
-cmake -S . -B build/qt-windows -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
-cmake --build build/qt-windows --config Debug
-ctest --test-dir build/qt-windows -C Debug --output-on-failure
-./build/qt-windows/Debug/salamander-qt.exe
-```
-
-The example path must match the actual installation. The Qt CI builds Linux with the distro Qt and Windows with Qt 6.8.3. Build artifacts are not self-contained release packages. Packaging, runtime deployment and clean-machine testing are later milestones.
+The official Windows project is [OpenSalamander/salamander](https://github.com/OpenSalamander/salamander). This fork focuses on Linux, preserving source history and tracing adopted improvements. See [UPSTREAM.md](UPSTREAM.md) for checking new commits, preparing isolated integration worktrees and recording adaptation decisions. Matching Altap 4.0 workflows is the initial baseline; Linux-specific improvements are encouraged.
 
 ## Version control
 

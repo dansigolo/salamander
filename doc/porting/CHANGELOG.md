@@ -3,7 +3,9 @@
 ## Unreleased — keyboard/navigation milestone
 
 - Set Altap Salamander 4.0 x64 as the visual and functional reference.
-- Target a common Windows/Linux Qt codebase and add a CI build/test job for each.
+- Focus this fork on Linux; keep the official Windows upstream as a tracked source of improvements.
+- Add upstream checking and isolated source-integration tooling, with regression tests and a read-only monitoring workflow.
+- Add Linux build/test CI. A Windows job was briefly introduced, then removed after the scope decision.
 - Separate focus from marked items; Insert/Space mark and advance; Shift navigation selects or unselects ranges; Ctrl+A/Ctrl+D select all/none.
 - Add prefix quick search with matching-name navigation, prefix editing and Escape.
 - Keep directories first in ascending and descending sorts; provide extension sorting and Ctrl+F3/F4/F5/F6.

@@ -2,13 +2,13 @@
 
 Reference confirmed by user screenshot on 2026-11-07. Use the user's Windows installation for manual behavior and layout comparison. Use `src/` and `help/src/hh/salamand/` as technical references; Open Salamander may differ from Altap 4.0. The user's custom paths, favorites and commands are configuration, not defaults to hardcode.
 
-Goal: preserve workflows, controls, menus and toolbars on Windows and Linux wherever the platform provides an equivalent. Exact system fonts, native decorations and platform-specific integration may differ. Every exception must be recorded, not silently omitted. This is an initial inventory and must be expanded by walking each menu/dialog and plugin; it is not a claim of full coverage.
+Goal: preserve workflows, controls, menus and toolbars on Linux wherever the platform provides an equivalent. Windows development remains with the official upstream. The baseline does not limit independent Linux improvements. Exact system fonts, native decorations and platform-specific integration may differ. Every exception must be recorded, not silently omitted. This is an initial inventory and must be expanded by walking each menu/dialog and plugin; it is not a claim of full coverage.
 
 Statuses: partial = implemented subset; pending = not implemented; platform decision = requires an explicit OS-specific equivalent.
 
 | Area | Current status | Remaining work / acceptance |
 | --- | --- | --- |
-| Native Windows/Linux Qt application | Partial | Linux locally compiled/tested; Windows CI validation required |
+| Native Linux Qt application | Partial | Linux locally compiled/tested; X11/Wayland desktop validation remains |
 | Dual panels and splitter | Partial | Match proportions, focus indicators, density and detailed layout |
 | Menu bar: Left, Files, Edit, Commands, Plugins, Options, Right, Help | Partial | Prototype File/View menus only; inventory and implement actual commands |
 | Top toolbar | Pending | Match original actions, icons, separators, tooltips, customization |
@@ -41,7 +41,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Compare/synchronize/checksums/rename tools | Pending | Inventory exact core/plugin boundaries |
 | Settings / themes / shortcuts / translations | Pending | Defaults, persistence, migration and customization |
 | Plugin system and supplied plugins | Pending | Inventory every plugin, dependencies and available source; no Windows DLL ABI promise |
-| Registry / COM / Windows Shell integrations | Platform decision | Retain where applicable on Windows; decide Linux equivalents per command |
+| Registry / COM / Windows Shell integrations | Platform decision | Official upstream retains Windows integrations; decide Linux equivalents per command |
 | Network paths / FTP / remote providers | Pending | Native paths plus plugin functionality and missing dependencies |
 | Help / About / licenses | Pending | User-facing documentation and notices; existing LICENSE retained |
 | Distribution | Pending | Versioning, runtime deployment, installers/packages, clean-machine tests, release notes |
@@ -55,4 +55,4 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 - `src/fileswn0.cpp`: Insert/Space advance, range-selection rules and quick-search state.
 - `port/tests/panel_tests.cpp`: automated temporary-directory keyboard/navigation/sort fixtures.
 
-Automated tests are necessary but do not establish visual parity. Windows/Linux manual acceptance remains a separate check for each milestone.
+Automated tests are necessary but do not establish visual parity. Linux desktop acceptance against the Windows reference remains a separate check for each milestone. Windows builds of this fork are out of scope.
