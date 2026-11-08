@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "filepanel.h"
+#include "fileview.h"
 #include <QApplication>
 #include <QAction>
 #include <QDir>
@@ -9,6 +10,8 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTreeView>
+#include <QHeaderView>
+#include <utility>
 
 int main(int argc, char** argv)
 {
@@ -41,11 +44,19 @@ int main(int argc, char** argv)
         swap->setContext(Qt::WidgetShortcut);
         QObject::connect(swap, &QShortcut::activated, other->view(), [other]
                          { other->view()->setFocus(); });
-        auto* up = new QShortcut(QKeySequence(QStringLiteral("Alt+Up")), panel);
-        up->setContext(Qt::WidgetWithChildrenShortcut);
-        QObject::connect(up, &QShortcut::activated, panel, &FilePanel::goUp);
+        const std::pair<int, int> sorting[] = {{Qt::Key_F3, 0}, {Qt::Key_F4, 2}, {Qt::Key_F5, 3}, {Qt::Key_F6, 1}};
+        for (const auto& [key, column] : sorting)
+        {
+            auto* shortcut = new QShortcut(QKeySequence(Qt::CTRL | key), panel);
+            shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+            QObject::connect(shortcut, &QShortcut::activated, panel, [panel, column]
+                             {
+                auto* header = panel->view()->header();
+                const auto order = header->sortIndicatorSection() == column && header->sortIndicatorOrder() == Qt::AscendingOrder ? Qt::DescendingOrder : Qt::AscendingOrder;
+                panel->view()->sortByColumn(column, order); });
+        }
     }
-    window.statusBar()->showMessage(QObject::tr("Tab: switch panels | Alt+Up: parent | Ctrl+H: hidden files | Enter: open directory"));
+    window.statusBar()->showMessage(QObject::tr("Tab: panels | Insert/Space: mark | Backspace: parent | Type: quick search | Esc: end search"));
     window.resize(1200, 700);
     window.show();
     left->view()->setFocus();

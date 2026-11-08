@@ -2,6 +2,10 @@
 
 Open Salamander is a fast, reliable, dual-pane file manager for Windows.
 
+## Experimental Windows/Linux Qt port
+
+The native Qt port is developed on `improvement/salamander_for_linux`, with Altap Salamander 4.0 x64 as its functional and visual target. It is an early prototype, not a feature-complete release. See the [build instructions](doc/porting/README.md), [parity tracker](doc/porting/PARITY.md), and [contribution workflow](doc/porting/CONTRIBUTING.md).
+
 ## Origin
 
 The original version of Servant Salamander was developed by Petr Šolín while he was studying at the Czech Technical University. He released it as freeware in 1997. After graduating, Petr Šolín founded [Altap](https://www.altap.cz/) together with Jan Ryšavý. In 2001, they released the first shareware version of the program. In 2007, the project was renamed Altap Salamander with the release of version 2.5. Many other programmers and translators have [contributed](AUTHORS) to the project over the years. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After the acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the source code was released under the GPLv2 license as Open Salamander 5.0.

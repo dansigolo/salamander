@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include <QWidget>
+#include <QHash>
+#include <QModelIndex>
+#include <QSet>
+#include <QStringList>
 class QFileSystemModel;
 class QLineEdit;
 class QLabel;
-class QTreeView;
+class FileView;
+class DirectorySortModel;
 class FilePanel : public QWidget
 {
 public:
@@ -13,13 +18,27 @@ public:
     void goUp();
     void setHiddenFilesVisible(bool visible);
     QString currentPath() const;
-    QTreeView* view() const { return view_; }
+    FileView* view() const { return view_; }
     QFileSystemModel* model() const { return model_; }
+    QModelIndex visibleIndex(const QString& path) const;
 
 private:
+    struct LocationState
+    {
+        QString focused;
+        QStringList selected;
+        int scroll = 0;
+    };
+    void saveLocation();
+    void restoreLocation(bool loaded);
+    void updateStatus();
     QFileSystemModel* model_;
-    QTreeView* view_;
+    DirectorySortModel* sorted_;
+    FileView* view_;
     QLineEdit* path_;
     QLabel* status_;
     QString currentPath_;
+    QHash<QString, LocationState> locations_;
+    QSet<QString> loaded_;
+    bool restoring_ = false;
 };

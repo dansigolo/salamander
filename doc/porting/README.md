@@ -1,11 +1,11 @@
 # Native Qt port: initial architecture and roadmap
 
-Status: experimental bootstrap. This is not a complete Linux port. The existing Windows source is the reference for behavior.
+Status: experimental native Windows/Linux Qt port. Altap Salamander 4.0 x64 is the functional and visual target, confirmed by the user on 2026-11-07. The Open Salamander source is the technical reference. Full parity is not yet implemented; see [PARITY.md](PARITY.md).
 
 ## Decisions
 
 - C++17, Qt 6 Widgets (minimum 6.4), CMake 3.21 and Ninja.
-- Develop first on Linux Mint 22.3 / Ubuntu 24.04 package base. Validate both X11 and Wayland later.
+- Support Windows x64 and Linux x64 from one Qt codebase. Develop locally on Linux Mint 22.3 / Ubuntu 24.04. Test Windows through CI; validate X11 and Wayland separately.
 - Incrementally extract reusable algorithms rather than replacing all code or emulating WinAPI.
 - Keep the Visual Studio build untouched. The root CMake project builds only the experimental port.
 - Core algorithms in `port/core/`, Widgets presentation in `port/qt/`, tests in `port/tests/`.
@@ -13,13 +13,13 @@ Status: experimental bootstrap. This is not a complete Linux port. The existing 
 - QFileSystemModel is the local-directory bootstrap model; it is not the final archive/plugin abstraction.
 - Use a dedicated native plugin contract in a later milestone. Existing Windows DLLs are not supported by this prototype.
 
-## Bootstrap delivered
+## Implemented so far
 
-Two independent directory panels, path entry, selection using standard Qt behavior, sortable columns, directory activation, parent navigation, hidden-file toggle and focused-panel switching. Directory enumeration uses QFileSystemModel. Editing and drag/drop are disabled. No file-operation commands exist.
+Two independent directory panels, path entry, marked items separate from focus, Insert/Space toggle-and-advance, Shift navigation selection, Ctrl+A/Ctrl+D, prefix quick search, directories-first sorting, directory activation, parent navigation, hidden-file toggle and focused-panel switching. Each panel remembers focus and selection for previously visited directories during the session. Directory enumeration uses QFileSystemModel. Editing and drag/drop are disabled. No file-operation commands exist.
 
 `port/core/mask.cpp` extracts `PrepareMask` from `src/masks.cpp` at upstream commit `a201fa3cc708c74dc1f4eea7032e0758840447a1`, removing the diagnostic macro and changing only the function name/namespace. The algorithm is tested independently of Qt. It is not yet wired into the UI: complete wildcard matching and Unicode policy remain open.
 
-The UI is newly implemented. Its standard Qt selection and sorting are not yet verified against Salamander. One extracted function does not imply that the original engine has been ported.
+The UI is newly implemented. The first bootstrap was manually accepted on Linux Mint by the user. Subsequent behavior is checked against upstream source/help and automated fixtures; it still needs manual comparison against Altap 4.0. Directory size calculation on Space, full wildcard quick search, advanced sorting and exact mouse-selection behavior remain pending. One extracted function does not imply that the original engine has been ported.
 
 ## Milestones and acceptance
 
@@ -52,7 +52,27 @@ Tests use the offscreen Qt platform; they do not validate actual X11/Wayland ren
 
 - Tab switches panels when the file view has focus; text fields retain ordinary focus traversal.
 - Enter activates directories; files are not launched in this bootstrap.
-- Alt+Up navigates to the parent; Ctrl+H toggles hidden files in both panels.
+- Backspace navigates to the parent (when quick search is inactive); Alt+Up/Down moves among marked items; Ctrl+H toggles hidden files in both panels. This corrects the prototype shortcut to match Salamander.
+- Insert/Space toggle marking and advance; arrows retain marks; Shift+navigation selects or unselects based on the initial item.
+- Typing starts prefix quick search; Up/Down finds matching names; Right extends, Left/Backspace shortens and Escape exits. Full wildcard/IME behavior is pending.
+- Ctrl+F3/F4/F5/F6 sort the active panel by name/extension/date/size; repeating reverses the order.
 - Invalid directory input leaves the current location intact and displays an error.
 - Unicode directory names, symlink navigation, large directories, inaccessible paths and disconnected mounts need additional coverage.
 - Appearance, focus and shortcuts need manual checks in X11 and Wayland.
+
+## Windows Qt build
+
+Install Visual Studio 2022 C++ tools, CMake and an MSVC x64 build of Qt >= 6.4. Set `CMAKE_PREFIX_PATH` to that Qt installation. For example, from a developer PowerShell:
+
+```powershell
+cmake -S . -B build/qt-windows -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+cmake --build build/qt-windows --config Debug
+ctest --test-dir build/qt-windows -C Debug --output-on-failure
+./build/qt-windows/Debug/salamander-qt.exe
+```
+
+The example path must match the actual installation. The Qt CI builds Linux with the distro Qt and Windows with Qt 6.8.3. Build artifacts are not self-contained release packages. Packaging, runtime deployment and clean-machine testing are later milestones.
+
+## Version control
+
+Development branch: `improvement/salamander_for_linux`. Keep focused commits, run CTest before pushing, and use pull requests before merging to main. See [CONTRIBUTING.md](CONTRIBUTING.md). Repository visibility and release publication are separate future decisions.

@@ -1,6 +1,6 @@
 # Open Salamander development
 
-The Windows application in `src/` remains the functional reference. The native Qt port is experimental and lives in `port/`.
+The Windows application in `src/` remains the functional reference. The native Qt port targets Windows and Linux, is experimental, and lives in `port/`. Altap Salamander 4.0 x64 is the user-facing parity reference; the upstream Open Salamander source is the implementation reference.
 
 - Use C++17, Qt >= 6.4 Widgets and CMake >= 3.21 for the port.
 - Keep platform-independent algorithms in `port/core/`; do not include Windows or Qt GUI headers there.
@@ -18,3 +18,7 @@ Test: `ctest --test-dir build/qt --output-on-failure`
 Run: `./build/qt/salamander-qt`
 
 Architecture and scope: `doc/porting/README.md`.
+
+- Track parity explicitly in `doc/porting/PARITY.md`, including menus, toolbars, controls, keyboard behavior and plugins.
+- Preserve both Windows and Linux in the Qt CI matrix. Do not claim Windows validation until its job passes.
+- Use focused commits on `improvement/salamander_for_linux`; do not force-push, change repository visibility, merge into main, or publish releases implicitly.
