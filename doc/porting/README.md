@@ -16,7 +16,7 @@ Status: experimental native Linux Qt port. Altap Salamander 4.0 x64 is the funct
 
 ## Implemented so far
 
-Two independent directory panels, path entry, marked items separate from focus, Insert/Space toggle-and-advance, Shift navigation selection, Ctrl+A/Ctrl+D, prefix quick search, directories-first sorting, directory activation, parent navigation, hidden-file toggle and focused-panel switching. Each panel remembers focus and selection for previously visited directories during the session. Directory enumeration uses QFileSystemModel. Editing and drag/drop are disabled. No file-operation commands exist.
+Two independent directory panels, path entry, marked items separate from focus, Insert/Space toggle-and-advance, Shift navigation selection, Ctrl+A/Ctrl+D, prefix quick search, directories-first sorting, directory activation, parent navigation, hidden-file toggle and focused-panel switching. Each panel remembers focus for visited directories. Marks clear on directory changes by default; Options > Preserve selection when changing directories enables session-only selection memory. That preference is persisted across application restarts. Directory enumeration uses QFileSystemModel. Editing and drag/drop are disabled. No file-operation commands exist.
 
 `port/core/mask.cpp` extracts `PrepareMask` from `src/masks.cpp` at upstream commit `a201fa3cc708c74dc1f4eea7032e0758840447a1`, removing the diagnostic macro and changing only the function name/namespace. The algorithm is tested independently of Qt. It is not yet wired into the UI: complete wildcard matching and Unicode policy remain open.
 

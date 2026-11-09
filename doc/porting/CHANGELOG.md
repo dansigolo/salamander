@@ -1,6 +1,13 @@
 # Qt port development log
 
-## Unreleased — interface milestone (2026-11-08)
+## Selection policy (2026-11-09)
+
+- Match the user-observed Altap 4.0 behavior: clear marks when changing directories while restoring navigation focus.
+- Add a persisted Options preference to retain marks during the current session; default off.
+- Keep current marks on failed/same-directory navigation and filesystem refreshes.
+- Cover both policies, preference toggling, both panels and application-restart persistence in tests.
+
+## Interface milestone (2026-11-08)
 
 - Add original menu order, shared active-panel actions and top/places/function-key bars.
 - Present Name/Ext/Size/Date/Time/Attr, basic Linux permission strings and a parent row excluded from marking.

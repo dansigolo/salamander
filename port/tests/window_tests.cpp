@@ -12,6 +12,7 @@
 #include <QMenuBar>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QSettings>
 #include <QToolBar>
 #include <QToolButton>
 class WindowTests : public QObject
@@ -92,6 +93,40 @@ private slots:
             QVERIFY(action);
             QVERIFY(!action->isEnabled());
         }
+    }
+    void selectionPreferenceAppliesToBothPanelsAndPersists()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        const QString config = temporary.filePath("preferences.ini");
+        {
+            QSettings settings(config, QSettings::IniFormat);
+            MainWindow window(temporary.path(), temporary.path(), false, &settings);
+            auto* option = window.findChild<QAction*>("preserveSelectionOnNavigation");
+            QVERIFY(option);
+            QVERIFY(!option->isChecked());
+            QVERIFY(!window.leftPanel()->preservesSelectionOnNavigation());
+            QVERIFY(!window.rightPanel()->preservesSelectionOnNavigation());
+            option->setChecked(true);
+            QVERIFY(window.leftPanel()->preservesSelectionOnNavigation());
+            QVERIFY(window.rightPanel()->preservesSelectionOnNavigation());
+            settings.sync();
+            QCOMPARE(settings.status(), QSettings::NoError);
+        }
+        {
+            QSettings settings(config, QSettings::IniFormat);
+            MainWindow window(temporary.path(), temporary.path(), false, &settings);
+            QVERIFY(window.findChild<QAction*>("preserveSelectionOnNavigation")->isChecked());
+            QVERIFY(window.leftPanel()->preservesSelectionOnNavigation());
+            QVERIFY(window.rightPanel()->preservesSelectionOnNavigation());
+            window.findChild<QAction*>("preserveSelectionOnNavigation")->setChecked(false);
+            settings.sync();
+        }
+        QSettings settings(config, QSettings::IniFormat);
+        MainWindow window(temporary.path(), temporary.path(), false, &settings);
+        QVERIFY(!window.findChild<QAction*>("preserveSelectionOnNavigation")->isChecked());
+        QVERIFY(!window.leftPanel()->preservesSelectionOnNavigation());
+        QVERIFY(!window.rightPanel()->preservesSelectionOnNavigation());
     }
     void screenshotFixture()
     {

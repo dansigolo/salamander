@@ -7,11 +7,12 @@ class QComboBox;
 class QLineEdit;
 class QMenu;
 class QToolBar;
+class QSettings;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit MainWindow(const QString& leftPath, const QString& rightPath, bool inspectVolumes = true);
+    explicit MainWindow(const QString& leftPath, const QString& rightPath, bool inspectVolumes = true, QSettings* settings = nullptr);
     ~MainWindow() override;
     FilePanel* leftPanel() const { return left_; }
     FilePanel* rightPanel() const { return right_; }
@@ -32,4 +33,5 @@ private:
     QComboBox* volumes_;
     QLineEdit* location_;
     QMenu* favorites_;
+    QSettings* settings_;
 };

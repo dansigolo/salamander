@@ -111,6 +111,7 @@ private slots:
             QVERIFY(file.open(QIODevice::WriteOnly));
         }
         FilePanel panel(root.path());
+        panel.setPreserveSelectionOnNavigation(true);
         panel.show();
         auto* view = panel.view();
         view->setFocus();
@@ -152,6 +153,7 @@ private slots:
             file.write(name[0] == 'a' ? "a" : "longer");
         }
         FilePanel panel(root.path());
+        panel.setPreserveSelectionOnNavigation(true);
         auto* view = panel.view();
         QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 4);
         for (const auto order : {Qt::AscendingOrder, Qt::DescendingOrder})
@@ -213,6 +215,7 @@ private slots:
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.close();
         FilePanel panel(root.path());
+        panel.setPreserveSelectionOnNavigation(true);
         auto* view = panel.view();
         QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 3);
         const auto index = panel.visibleIndex(file.fileName());
@@ -232,6 +235,64 @@ private slots:
         created.close();
         QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 4);
         QCOMPARE(panel.selectedPaths(), QStringList{file.fileName()});
+    }
+    void defaultClearsMarksButKeepsFocusAndInvalidNavigationPreservesMarks()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("child"));
+        QFile file(root.filePath("file.txt"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+        FilePanel panel(root.path());
+        QVERIFY(!panel.preservesSelectionOnNavigation());
+        auto* view = panel.view();
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 3);
+        const auto mark = [&]
+        {
+            for (const auto& path : {file.fileName(), root.filePath("child")})
+                view->selectionModel()->select(panel.visibleIndex(path), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        };
+        mark();
+        QCOMPARE(panel.selectedPaths().size(), 2);
+        QVERIFY(!panel.navigate("missing"));
+        QCOMPARE(panel.selectedPaths().size(), 2);
+        QVERIFY(panel.navigate(root.path())); // Same location is not a directory change.
+        QCOMPARE(panel.selectedPaths().size(), 2);
+        QVERIFY(panel.navigate("child"));
+        panel.goUp();
+        QTRY_COMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("child"));
+        QVERIFY(panel.selectedPaths().isEmpty());
+        mark();
+        QVERIFY(panel.navigate("child"));
+        panel.goBack();
+        QTRY_COMPARE(panel.currentPath(), root.path());
+        QVERIFY(panel.selectedPaths().isEmpty());
+    }
+    void disablingPreferenceDropsCachedMarksWithoutClearingCurrentMarks()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("child"));
+        QFile file(root.filePath("file.txt"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+        FilePanel panel(root.path());
+        panel.setPreserveSelectionOnNavigation(true);
+        auto* view = panel.view();
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 3);
+        view->selectionModel()->select(panel.visibleIndex(file.fileName()), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        panel.setPreserveSelectionOnNavigation(false);
+        QCOMPARE(panel.selectedPaths().size(), 1);
+        panel.setPreserveSelectionOnNavigation(true);
+        QVERIFY(panel.navigate("child"));              // Cache root marks while enabled.
+        panel.setPreserveSelectionOnNavigation(false); // Drop that cache.
+        panel.setPreserveSelectionOnNavigation(true);
+        panel.goUp();
+        QTRY_COMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("child"));
+        QVERIFY(panel.selectedPaths().isEmpty());
     }
 };
 QTEST_MAIN(PanelTests)

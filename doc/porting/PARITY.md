@@ -29,7 +29,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Prefix quick search | Partial | Up/Down/Home/End, extend/shorten, Escape; wildcard aliases, Shift/Alt search combinations and IME pending |
 | Sort by name / extension / date / size | Partial | Directories first both ways; Ctrl+F3/F4/F5/F6; locale/natural sorting, options and persistence pending |
 | Sort by attributes | Partial | Header sorts basic Linux permission text; ACL/special bits and options pending |
-| Navigation focus/selection memory | Partial | Session-only directory snapshots; large/slow/removable filesystem testing pending |
+| Navigation focus/selection memory | Partial | Focus memory retained; marks clear on navigation by default, with a persisted opt-in for session selection memory; large/slow/removable filesystem tests pending |
 | Hidden files | Partial | Native Qt semantics; Linux dot files and Windows hidden attribute fixtures |
 | View modes / zoom / thumbnails | Pending | Detailed, brief, icons, thumbnails, tiles and associated settings |
 | Copy/move/rename/mkdir/delete/trash | Pending | Background service with overwrite/cancel/error/symlink policies |
@@ -39,7 +39,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Archives / pack/unpack | Pending | Inventory built-ins and plugins; provider abstraction |
 | Clipboard / drag-and-drop | Pending | Paths, files, URI lists, inter-panel/desktop operations |
 | Compare/synchronize/checksums/rename tools | Pending | Inventory exact core/plugin boundaries |
-| Settings / themes / shortcuts / translations | Pending | Defaults, persistence, migration and customization |
+| Settings / themes / shortcuts / translations | Partial | Selection-preservation preference persisted; other settings, themes, shortcut editing and migration pending |
 | Plugin system and supplied plugins | Pending | Inventory every plugin, dependencies and available source; no Windows DLL ABI promise |
 | Registry / COM / Windows Shell integrations | Platform decision | Official upstream retains Windows integrations; decide Linux equivalents per command |
 | Network paths / FTP / remote providers | Pending | Native paths plus plugin functionality and missing dependencies |

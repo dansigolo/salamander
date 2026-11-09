@@ -15,6 +15,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QShortcut>
+#include <QSettings>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -33,7 +34,7 @@ QAction* MainWindow::unavailable(const QString& text, const QString& name)
     return action;
 }
 
-MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool inspectVolumes)
+MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool inspectVolumes, QSettings* settings) : settings_(settings ? settings : new QSettings(this))
 {
     setObjectName("salamanderWindow");
     auto* central = new QWidget(this);
@@ -138,6 +139,18 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     connect(hidden, &QAction::toggled, right_, &FilePanel::setHiddenFilesVisible);
     top->addAction(hidden);
     optionsMenu->addAction(hidden);
+    auto* preserve = new QAction(tr("Preserve selection when changing directories"), this);
+    preserve->setObjectName("preserveSelectionOnNavigation");
+    preserve->setCheckable(true);
+    preserve->setChecked(settings_->value("panels/preserveSelectionOnNavigation", false).toBool());
+    left_->setPreserveSelectionOnNavigation(preserve->isChecked());
+    right_->setPreserveSelectionOnNavigation(preserve->isChecked());
+    connect(preserve, &QAction::toggled, this, [this](bool enabled)
+            {
+        left_->setPreserveSelectionOnNavigation(enabled);
+        right_->setPreserveSelectionOnNavigation(enabled);
+        settings_->setValue("panels/preserveSelectionOnNavigation", enabled); });
+    optionsMenu->addAction(preserve);
     auto* sortMenu = commandsMenu->addMenu(tr("Sort by"));
     const QString sortTexts[] = {tr("Sort by name"), tr("Sort by extension"), tr("Sort by date"), tr("Sort by size")};
     const QString sortNames[] = {"sortName", "sortExtension", "sortDate", "sortSize"};

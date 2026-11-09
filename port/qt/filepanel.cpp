@@ -205,8 +205,8 @@ void FilePanel::saveLocation()
         return;
     LocationState state;
     state.focused = model_->filePath(sourceIndex(view_->currentIndex()));
-    for (const auto& index : view_->selectionModel()->selectedRows())
-        state.selected.append(model_->filePath(sourceIndex(index)));
+    if (preserveSelection_)
+        state.selected = selectedPaths();
     state.scroll = view_->verticalScrollBar()->value();
     locations_[currentPath_] = state;
 }
@@ -226,7 +226,7 @@ void FilePanel::restoreLocation(bool loaded)
     if (!loaded && !focused.isValid())
         return;
     view_->clearSelection();
-    for (const auto& path : state.selected)
+    for (const auto& path : preserveSelection_ ? state.selected : QStringList())
     {
         const auto index = visibleIndex(path);
         if (index.isValid() && index.parent() == view_->rootIndex())
@@ -338,4 +338,12 @@ bool FilePanel::eventFilter(QObject* watched, QEvent* event)
     if (event->type() == QEvent::MouseButtonPress)
         emit panelActivated();
     return QWidget::eventFilter(watched, event);
+}
+
+void FilePanel::setPreserveSelectionOnNavigation(bool enabled)
+{
+    preserveSelection_ = enabled;
+    if (!enabled)
+        for (auto& location : locations_)
+            location.selected.clear();
 }

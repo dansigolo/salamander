@@ -26,6 +26,8 @@ public:
     bool canGoForward() const;
     void setActive(bool active);
     QStringList selectedPaths() const;
+    void setPreserveSelectionOnNavigation(bool enabled);
+    bool preservesSelectionOnNavigation() const { return preserveSelection_; }
     void setHiddenFilesVisible(bool visible);
     QString currentPath() const;
     FileView* view() const { return view_; }
@@ -69,4 +71,5 @@ private:
     QHash<QString, LocationState> locations_;
     QSet<QString> loaded_;
     bool restoring_ = false;
+    bool preserveSelection_ = false;
 };

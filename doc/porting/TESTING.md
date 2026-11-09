@@ -28,8 +28,9 @@ Esse comando cria uma pasta exclusiva em `/tmp/salamander-linux-test-*`, com pai
 | Nomes especiais | Use Ctrl+H | `.hidden` e `.config.json` aparecem; nomes com acentos e espaços permanecem íntegros |
 | Atributos Linux | Observe `run-me.sh` e `alpha-link.txt` | Permissões no formato `-rwx…`; o link começa com `l`; a pasta com `d` |
 | Painel ativo | Clique em cada painel, pressione Tab e Shift+Tab | O painel ativo muda; barras e menus Commands/Edit atuam nele |
-| Navegação | Entre em `folder-a` com Enter; volte com Backspace | Retorna à pasta anterior com foco em `folder-a`; marcações anteriores são restauradas |
+| Navegação | Entre em `folder-a` com Enter; volte com Backspace | Retorna à pasta anterior com foco em `folder-a`, sem marcações por padrão |
 | Linha `..` | Dê Enter em `..`; tente marcá-la com Insert | Sobe um diretório; `..` nunca entra nos arquivos marcados e permanece primeiro, mesmo com ordenação invertida |
+| Personalização | Options > Preserve selection when changing directories; marque itens, entre em uma pasta e volte | Com a opção ligada, restaura as marcas; desligada, limpa ao mudar de pasta. A preferência permanece após reiniciar, mas as marcas não são salvas entre execuções |
 | Histórico | Navegue entre pastas e use voltar/avançar ou Alt+Left/Alt+Right | Caminhos anteriores são reabertos; histórico de um painel não altera o outro |
 | Caminho inválido | Digite um caminho inexistente na barra do painel e Enter | A pasta atual é mantida e o erro aparece na linha de status |
 | Marcação | Use Insert/Espaço sobre arquivos, depois mova com setas | Alterna a marcação e avança; setas movem o foco sem apagar marcações |
@@ -45,6 +46,8 @@ Esse comando cria uma pasta exclusiva em `/tmp/salamander-linux-test-*`, com pai
 | Barras visíveis | Options > nomes das barras | Mostra/oculta as barras durante a sessão |
 | Ajuda e menus | F1 e F10 | Abre a ajuda de atalhos e ativa os menus |
 | Monitoramento | Com um arquivo marcado, crie outro arquivo nessa pasta usando um editor/terminal | A lista é atualizada e o arquivo original permanece marcado |
+
+Desligar a opção de preservar marcações não desmarca imediatamente os itens atuais; a política vale na próxima mudança de pasta e descarta marcações guardadas anteriormente. Navegação inválida ou para a mesma pasta não apaga marcas. Atualizações da lista na pasta atual continuam preservando marcas.
 
 Backspace edita o prefixo quando a busca rápida está ativa. Pressione Esc antes de usá-lo para subir uma pasta. Ctrl+A em um campo de texto mantém a seleção de texto normal.
 
