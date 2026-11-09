@@ -153,7 +153,12 @@ bool FilePanel::navigateInternal(const QString& path, int historyTarget)
     currentPath_ = destination;
     restoring_ = false;
     model_->setFilter(QDir::AllEntries | QDir::System | (model_->filter() & QDir::Hidden) | (QDir(currentPath_).isRoot() ? QDir::NoDotAndDotDot : QDir::NoDot));
-    view_->setRootIndex(sorted_->mapFromSource(details_->mapFromSource(model_->setRootPath(currentPath_))));
+    // Keep one filesystem tree alive across navigation. Repeated setRootPath()
+    // detaches watchers in Qt 6.4 and can miss reattachment during rapid revisits.
+    const auto sourceRoot = historyPosition_ < 0 ? model_->setRootPath(currentPath_) : model_->index(currentPath_);
+    if (model_->canFetchMore(sourceRoot))
+        model_->fetchMore(sourceRoot);
+    view_->setRootIndex(sorted_->mapFromSource(details_->mapFromSource(sourceRoot)));
     view_->clearSelection();
     view_->selectionModel()->setCurrentIndex({}, QItemSelectionModel::NoUpdate);
     restoring_ = true;

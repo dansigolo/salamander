@@ -5,6 +5,7 @@
 - Match the user-observed Altap 4.0 behavior: clear marks when changing directories while restoring navigation focus.
 - Add a persisted Options preference to retain marks during the current session; default off.
 - Keep current marks on failed/same-directory navigation and filesystem refreshes.
+- Keep the filesystem model tree alive across navigation to avoid losing file monitoring during rapid directory revisits on Qt 6.4.
 - Cover both policies, preference toggling, both panels and application-restart persistence in tests.
 
 ## Interface milestone (2026-11-08)

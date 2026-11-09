@@ -230,6 +230,11 @@ private slots:
         panel.goForward();
         QCOMPARE(panel.currentPath(), root.filePath("child"));
         panel.goBack();
+        for (int attempt = 0; attempt < 8; ++attempt)
+        {
+            panel.goForward();
+            panel.goBack();
+        }
         QFile created(root.filePath("another.txt"));
         QVERIFY(created.open(QIODevice::WriteOnly));
         created.close();
