@@ -1,53 +1,39 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "detailedfilemodel.h"
 #include <QSortFilterProxyModel>
-#include <QFileSystemModel>
 #include <QDateTime>
 class DirectorySortModel : public QSortFilterProxyModel
 {
 public:
     using QSortFilterProxyModel::QSortFilterProxyModel;
 
-    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override
-    {
-        if (index.column() == 2 && role == Qt::DisplayRole)
-        {
-            const auto info = static_cast<const QFileSystemModel*>(sourceModel())->fileInfo(mapToSource(index));
-            return info.isDir() ? QString() : info.suffix();
-        }
-        return QSortFilterProxyModel::data(index, role);
-    }
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override
-    {
-        if (orientation == Qt::Horizontal && section == 2 && role == Qt::DisplayRole)
-            return tr("Ext");
-        return QSortFilterProxyModel::headerData(section, orientation, role);
-    }
-
 protected:
     bool lessThan(const QModelIndex& left, const QModelIndex& right) const override
     {
-        const auto* files = static_cast<const QFileSystemModel*>(sourceModel());
+        const auto* files = static_cast<const DetailedFileModel*>(sourceModel());
         const auto a = files->fileInfo(left), b = files->fileInfo(right);
+        const bool ascending = sortOrder() == Qt::AscendingOrder;
+        if ((a.fileName() == "..") != (b.fileName() == ".."))
+            return ascending ? a.fileName() == ".." : b.fileName() == "..";
         if (a.isDir() != b.isDir())
-            return sortOrder() == Qt::AscendingOrder ? a.isDir() : !a.isDir();
-        // Directories remain ordered by name when sorting by size/date.
+            return ascending ? a.isDir() : !a.isDir();
         if (!a.isDir())
         {
-            if (left.column() == 1 && a.size() != b.size())
+            if (left.column() == DetailedFileModel::Size && a.size() != b.size())
                 return a.size() < b.size();
-            if (left.column() == 3 && a.lastModified() != b.lastModified())
+            if ((left.column() == DetailedFileModel::Date || left.column() == DetailedFileModel::Time) && a.lastModified() != b.lastModified())
                 return a.lastModified() < b.lastModified();
-            if (left.column() == 2)
+            if (left.column() == DetailedFileModel::Extension)
             {
-                const int type = QString::compare(a.suffix(), b.suffix(), Qt::CaseInsensitive);
-                if (type)
-                    return type < 0;
+                const int extension = QString::compare(a.suffix(), b.suffix(), Qt::CaseInsensitive);
+                if (extension)
+                    return extension < 0;
             }
         }
+        if (left.column() == DetailedFileModel::Attributes && DetailedFileModel::permissions(a) != DetailedFileModel::permissions(b))
+            return DetailedFileModel::permissions(a) < DetailedFileModel::permissions(b);
         int comparison = QString::compare(a.fileName(), b.fileName(), Qt::CaseInsensitive);
-        if (!comparison)
-            comparison = QString::compare(a.fileName(), b.fileName(), Qt::CaseSensitive);
-        return comparison < 0;
+        return comparison ? comparison < 0 : a.fileName() < b.fileName();
     }
 };

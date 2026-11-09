@@ -11,8 +11,10 @@ public:
 signals:
     void searchChanged(const QString& prefix);
     void parentRequested();
+    void panelSwitchRequested();
 
 protected:
+    bool focusNextPrevChild(bool next) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;

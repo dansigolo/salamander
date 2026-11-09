@@ -1,6 +1,16 @@
 # Qt port development log
 
-## Unreleased — keyboard/navigation milestone
+## Unreleased — interface milestone (2026-11-08)
+
+- Add original menu order, shared active-panel actions and top/places/function-key bars.
+- Present Name/Ext/Size/Date/Time/Attr, basic Linux permission strings and a parent row excluded from marking.
+- Add navigation history, editable path history, Go to directory, session favorites and mounted-volume navigation.
+- Query free space and volumes in background jobs; show focused metadata and selected file-byte totals.
+- Preserve persistent column indexes and selections while filesystem entries are updated.
+- Keep unavailable file/network/user-command actions disabled.
+- Add complete-window tests, a disposable manual-test fixture launcher and TESTING.md.
+
+## Keyboard/navigation milestone
 
 - Set Altap Salamander 4.0 x64 as the visual and functional reference.
 - Focus this fork on Linux; keep the official Windows upstream as a tracked source of improvements.

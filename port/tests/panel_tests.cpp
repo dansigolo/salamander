@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "filepanel.h"
 #include "fileview.h"
+#include "detailedfilemodel.h"
+#include <QAbstractItemModelTester>
+#include <QLabel>
 #include <QDir>
 #include <QFile>
 #include <QFileSystemModel>
@@ -25,7 +28,7 @@ private slots:
         file.close();
         FilePanel panel(root.absolutePath());
         QCOMPARE(panel.currentPath(), root.absolutePath());
-        QTRY_COMPARE(panel.view()->model()->rowCount(panel.view()->rootIndex()), 2);
+        QTRY_COMPARE(panel.view()->model()->rowCount(panel.view()->rootIndex()), 3);
         QVERIFY(panel.navigate(QStringLiteral("sub")));
         QCOMPARE(panel.currentPath(), root.filePath(QStringLiteral("sub")));
         panel.goUp();
@@ -49,10 +52,10 @@ private slots:
 #endif
         QVERIFY(root.mkdir(QStringLiteral("sub")));
         FilePanel left(root.absolutePath()), right(root.absolutePath());
-        QTRY_COMPARE(left.view()->model()->rowCount(left.view()->rootIndex()), 1);
-        left.setHiddenFilesVisible(true);
         QTRY_COMPARE(left.view()->model()->rowCount(left.view()->rootIndex()), 2);
-        QTRY_COMPARE(right.view()->model()->rowCount(right.view()->rootIndex()), 1);
+        left.setHiddenFilesVisible(true);
+        QTRY_COMPARE(left.view()->model()->rowCount(left.view()->rootIndex()), 3);
+        QTRY_COMPARE(right.view()->model()->rowCount(right.view()->rootIndex()), 2);
         QVERIFY(left.navigate(QStringLiteral("sub")));
         QCOMPARE(right.currentPath(), root.absolutePath());
     }
@@ -71,13 +74,13 @@ private slots:
         panel.show();
         auto* view = panel.view();
         view->setFocus();
-        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 4);
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 5);
         const auto alpha = panel.visibleIndex(root.filePath("alpha.txt"));
         const auto beta = panel.visibleIndex(root.filePath("beta.txt"));
         view->selectionModel()->setCurrentIndex(alpha, QItemSelectionModel::NoUpdate);
         QTest::keyClick(view, Qt::Key_Insert);
         QVERIFY(view->selectionModel()->isSelected(alpha));
-        QCOMPARE(view->currentIndex().data().toString(), QString("alphabet.txt"));
+        QCOMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("alphabet.txt"));
         QTest::keyClick(view, Qt::Key_Down);
         QCOMPARE(view->currentIndex(), beta);
         QVERIFY(view->selectionModel()->isSelected(alpha));
@@ -88,6 +91,7 @@ private slots:
         QVERIFY(!view->selectionModel()->isSelected(beta));
         QTest::keyClick(view, Qt::Key_Home, Qt::ShiftModifier);
         QCOMPARE(view->selectionModel()->selectedRows().size(), 4);
+        view->selectionModel()->setCurrentIndex(view->model()->index(1, 0, view->rootIndex()), QItemSelectionModel::NoUpdate);
         QTest::keyClick(view, Qt::Key_End, Qt::ShiftModifier);
         QCOMPARE(view->selectionModel()->selectedRows().size(), 0);
         QTest::keyClick(view, Qt::Key_A, Qt::ControlModifier);
@@ -110,17 +114,17 @@ private slots:
         panel.show();
         auto* view = panel.view();
         view->setFocus();
-        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 4);
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 5);
         const auto marked = panel.visibleIndex(root.filePath("beta.txt"));
         view->selectionModel()->select(marked, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         QTest::keyClicks(view, "al");
         QCOMPARE(view->searchPrefix(), QString("al"));
-        QCOMPARE(view->currentIndex().data().toString(), QString("alpha.txt"));
+        QCOMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("alpha.txt"));
         QVERIFY(view->selectionModel()->isSelected(marked));
         QTest::keyClick(view, Qt::Key_Down);
-        QCOMPARE(view->currentIndex().data().toString(), QString("alphabet.txt"));
+        QCOMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("alphabet.txt"));
         QTest::keyClick(view, Qt::Key_Up);
-        QCOMPARE(view->currentIndex().data().toString(), QString("alpha.txt"));
+        QCOMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("alpha.txt"));
         QTest::keyClick(view, Qt::Key_Right);
         QCOMPARE(view->searchPrefix(), QString("alp"));
         QTest::keyClick(view, Qt::Key_Backspace);
@@ -132,7 +136,7 @@ private slots:
         QVERIFY(panel.navigate("child"));
         QTest::keyClick(view, Qt::Key_Backspace);
         QCOMPARE(panel.currentPath(), root.path());
-        QTRY_COMPARE(view->currentIndex().data().toString(), QString("child"));
+        QTRY_COMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("child"));
         QVERIFY(view->selectionModel()->isSelected(marked));
     }
     void directoriesFirstInBothSortOrdersAndHistory()
@@ -149,22 +153,85 @@ private slots:
         }
         FilePanel panel(root.path());
         auto* view = panel.view();
-        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 3);
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 4);
         for (const auto order : {Qt::AscendingOrder, Qt::DescendingOrder})
-            for (const int column : {0, 1, 2, 3})
+            for (const int column : {0, 1, 2, 3, 4, 5})
             {
                 view->sortByColumn(column, order);
-                QCOMPARE(view->model()->index(0, 0, view->rootIndex()).data().toString(), QString("z-directory"));
+                QCOMPARE(view->model()->index(1, 0, view->rootIndex()).data().toString(), QString("z-directory"));
             }
         const auto file = panel.visibleIndex(root.filePath("b.txt"));
         view->selectionModel()->setCurrentIndex(file, QItemSelectionModel::NoUpdate);
         view->selectionModel()->select(file, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         QVERIFY(panel.navigate("z-directory"));
         QVERIFY(panel.navigate(root.path()));
-        QTRY_COMPARE(view->currentIndex().data().toString(), QString("b.txt"));
+        QTRY_COMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("b.txt"));
         QVERIFY(view->selectionModel()->isSelected(panel.visibleIndex(root.filePath("b.txt"))));
         QVERIFY(!panel.navigate("missing"));
-        QCOMPARE(view->currentIndex().data().toString(), QString("b.txt"));
+        QCOMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("b.txt"));
+    }
+    void detailedColumnsAndParentAreConsistent()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        const QDir root(temporary.path());
+        QFile file(root.filePath("example.tar.gz"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("test"), qint64(4));
+        file.close();
+        FilePanel panel(root.path());
+        auto* view = panel.view();
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 2);
+        QCOMPARE(view->model()->columnCount(), 6);
+        const auto index = panel.visibleIndex(file.fileName());
+        QCOMPARE(index.data().toString(), QString("example.tar"));
+        QCOMPARE(index.siblingAtColumn(1).data().toString(), QString("gz"));
+        QCOMPARE(index.data(QFileSystemModel::FileNameRole).toString(), QString("example.tar.gz"));
+        QVERIFY(!index.siblingAtColumn(3).data().toString().isEmpty());
+        QVERIFY(!index.siblingAtColumn(4).data().toString().isEmpty());
+        QCOMPARE(index.siblingAtColumn(5).data().toString().size(), 10);
+        const auto parent = view->model()->index(0, 0, view->rootIndex());
+        QCOMPARE(parent.data().toString(), QString(".."));
+        QVERIFY(!parent.flags().testFlag(Qt::ItemIsSelectable));
+        view->selectionModel()->setCurrentIndex(parent, QItemSelectionModel::NoUpdate);
+        QTest::keyClick(view, Qt::Key_Insert);
+        QVERIFY(panel.selectedPaths().isEmpty());
+        QCOMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("example.tar.gz"));
+        QTest::keyClick(view, Qt::Key_Space);
+        QCOMPARE(panel.selectedPaths().size(), 1);
+        QVERIFY(panel.findChild<QLabel*>("selectionStatus")->text().contains("selected"));
+        QAbstractItemModelTester consistency(view->model(), QAbstractItemModelTester::FailureReportingMode::QtTest);
+        consistency.setUseFetchMore(false);
+    }
+    void historyAndWatcherPreserveSelection()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("child"));
+        QFile file(root.filePath("file.txt"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+        FilePanel panel(root.path());
+        auto* view = panel.view();
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 3);
+        const auto index = panel.visibleIndex(file.fileName());
+        view->selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
+        view->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        QVERIFY(panel.navigate("child"));
+        QVERIFY(panel.canGoBack());
+        panel.goBack();
+        QCOMPARE(panel.currentPath(), root.path());
+        QVERIFY(panel.canGoForward());
+        QTRY_COMPARE(panel.selectedPaths().size(), 1);
+        panel.goForward();
+        QCOMPARE(panel.currentPath(), root.filePath("child"));
+        panel.goBack();
+        QFile created(root.filePath("another.txt"));
+        QVERIFY(created.open(QIODevice::WriteOnly));
+        created.close();
+        QTRY_COMPARE(view->model()->rowCount(view->rootIndex()), 4);
+        QCOMPARE(panel.selectedPaths(), QStringList{file.fileName()});
     }
 };
 QTEST_MAIN(PanelTests)

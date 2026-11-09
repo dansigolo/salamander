@@ -3,8 +3,15 @@
 #include <QFocusEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QFileSystemModel>
 #include <QScrollBar>
 #include <algorithm>
+
+bool FileView::focusNextPrevChild(bool)
+{
+    emit panelSwitchRequested();
+    return true;
+}
 
 void FileView::focusRow(int row)
 {
@@ -29,7 +36,8 @@ void FileView::toggleAndAdvance()
     const auto current = currentIndex().siblingAtColumn(0);
     if (!current.isValid())
         return;
-    selectionModel()->select(current, QItemSelectionModel::Toggle | QItemSelectionModel::Rows);
+    if (current.flags().testFlag(Qt::ItemIsSelectable))
+        selectionModel()->select(current, QItemSelectionModel::Toggle | QItemSelectionModel::Rows);
     focusRow(std::min(current.row() + 1, model()->rowCount(rootIndex()) - 1));
 }
 
@@ -38,7 +46,7 @@ bool FileView::findPrefix(const QString& prefix, int start, int direction)
     for (int row = start; row >= 0 && row < model()->rowCount(rootIndex()); row += direction)
     {
         const auto index = model()->index(row, 0, rootIndex());
-        if (index.data().toString().startsWith(prefix, Qt::CaseInsensitive))
+        if (index.flags().testFlag(Qt::ItemIsSelectable) && index.data(QFileSystemModel::FileNameRole).toString().startsWith(prefix, Qt::CaseInsensitive))
         {
             prefix_ = prefix;
             focusRow(row);
@@ -105,7 +113,7 @@ void FileView::keyPressEvent(QKeyEvent* event)
     }
     if (modifiers == Qt::NoModifier && !prefix_.isEmpty() && key == Qt::Key_Right)
     {
-        const QString name = currentIndex().siblingAtColumn(0).data().toString();
+        const QString name = currentIndex().siblingAtColumn(0).data(QFileSystemModel::FileNameRole).toString();
         if (prefix_.size() < name.size())
             findPrefix(name.left(prefix_.size() + 1), currentIndex().row(), 1);
         return;
@@ -171,7 +179,12 @@ void FileView::keyPressEvent(QKeyEvent* event)
                 target += row > oldRow ? -1 : 1;
             const auto first = model()->index(std::min(oldRow, target), 0, rootIndex());
             const auto last = model()->index(std::max(oldRow, target), 0, rootIndex());
-            selectionModel()->select(QItemSelection(first, last), (shiftSelectValue_ ? QItemSelectionModel::Select : QItemSelectionModel::Deselect) | QItemSelectionModel::Rows);
+            for (int item = first.row(); item <= last.row(); ++item)
+            {
+                const auto index = model()->index(item, 0, rootIndex());
+                if (index.flags().testFlag(Qt::ItemIsSelectable))
+                    selectionModel()->select(index, (shiftSelectValue_ ? QItemSelectionModel::Select : QItemSelectionModel::Deselect) | QItemSelectionModel::Rows);
+            }
         }
         focusRow(row);
         return;

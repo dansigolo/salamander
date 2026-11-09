@@ -4,7 +4,7 @@ Open Salamander is a fast, reliable, dual-pane file manager for Windows.
 
 ## Experimental Linux Qt port
 
-The native Linux Qt port is developed on `improvement/salamander_for_linux`, with Altap Salamander 4.0 x64 as its functional and visual target. It is an early prototype, not a feature-complete release. See the [build instructions](doc/porting/README.md), [parity tracker](doc/porting/PARITY.md), [contribution workflow](doc/porting/CONTRIBUTING.md), and [upstream synchronization](doc/porting/UPSTREAM.md).
+The native Linux Qt port is developed on `improvement/salamander_for_linux`, with Altap Salamander 4.0 x64 as its functional and visual target. It is an early prototype, not a feature-complete release. See the [build instructions](doc/porting/README.md), [testing guide](doc/porting/TESTING.md), [parity tracker](doc/porting/PARITY.md), [contribution workflow](doc/porting/CONTRIBUTING.md), and [upstream synchronization](doc/porting/UPSTREAM.md).
 
 ## Origin
 

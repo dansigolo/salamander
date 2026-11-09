@@ -68,3 +68,9 @@ The official Windows project is [OpenSalamander/salamander](https://github.com/O
 ## Version control
 
 Development branch: `improvement/salamander_for_linux`. Keep focused commits, run CTest before pushing, and use pull requests before merging to main. See [CONTRIBUTING.md](CONTRIBUTING.md). Repository visibility and release publication are separate future decisions.
+
+## Interface milestone
+
+The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. Unimplemented file operations are disabled.
+
+See [TESTING.md](TESTING.md) for compilation, disposable fixtures and a complete manual/automated test guide. Optional fixture launcher: `python3 tools/qt_smoke_fixture.py --launch`.
