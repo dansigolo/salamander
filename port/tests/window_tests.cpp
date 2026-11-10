@@ -5,6 +5,8 @@
 #include "detailedfilemodel.h"
 #include "namedialog.h"
 #include "operationcontroller.h"
+#include "copycontroller.h"
+#include "copydialogs.h"
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QMessageBox>
@@ -95,7 +97,7 @@ private slots:
             QCOMPARE(window.menuBar()->actions()[i]->text(), names[i]);
         for (const auto* name : {"topToolbar", "placesToolbar", "functionToolbar"})
             QVERIFY(window.findChild<QToolBar*>(name));
-        for (const auto* name : {"copyFiles", "moveFiles", "deleteFiles", "userMenu", "connectNetwork", "disconnectNetwork"})
+        for (const auto* name : {"moveFiles", "deleteFiles", "userMenu", "connectNetwork", "disconnectNetwork"})
         {
             auto* action = window.findChild<QAction*>(name);
             QVERIFY(action);
@@ -300,6 +302,151 @@ private slots:
         QVERIFY(!root.exists("b.txt"));
         QTRY_COMPARE(panel->selectedPaths().size(), 4);
     }
+
+    void f5CopiesMarkedItemsToTheOtherPanelWithoutDeletingSources()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("left"));
+        QVERIFY(root.mkdir("right"));
+        for (const auto* name : {"first.txt", "second.txt", "unselected.txt"})
+        {
+            QFile file(root.filePath(QString("left/") + name));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(name);
+        }
+        MainWindow window(root.filePath("left"), root.filePath("right"), false);
+        window.show();
+        window.activateWindow();
+        auto* source = window.leftPanel();
+        source->view()->setFocus();
+        QTRY_VERIFY(source->view()->hasFocus());
+        QTRY_COMPARE(source->view()->model()->rowCount(source->view()->rootIndex()), 4);
+        source->view()->selectionModel()->setCurrentIndex(source->visibleIndex(root.filePath("left/unselected.txt")), QItemSelectionModel::NoUpdate);
+        for (const auto* name : {"first.txt", "second.txt"})
+            source->view()->selectionModel()->select(source->visibleIndex(root.filePath(QString("left/") + name)), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        QTest::keyClick(source->view(), Qt::Key_F5);
+        auto* dialog = window.findChild<CopyDialog*>("copyDialog");
+        QVERIFY(dialog);
+        QCOMPARE(dialog->findChild<QLineEdit*>("copyDestination")->text(), root.filePath("right"));
+        dialog->accept();
+        auto* controller = window.findChild<CopyController*>();
+        QVERIFY(controller);
+        QTRY_VERIFY(!controller->isBusy());
+        QTRY_VERIFY(!window.findChild<CopyProgressDialog*>("copyProgressDialog"));
+        QVERIFY(root.exists("right/first.txt"));
+        QVERIFY(root.exists("right/second.txt"));
+        QVERIFY(!root.exists("right/unselected.txt"));
+        QVERIFY(root.exists("left/first.txt"));
+        QVERIFY(root.exists("left/second.txt"));
+        QTRY_COMPARE(window.rightPanel()->view()->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("second.txt"));
+        QCOMPARE(source->selectedPaths().size(), 2);
+        QCOMPARE(window.activePanel(), window.leftPanel());
+    }
+    void copyConflictButtonsSkipAndReplaceOnlyAfterConfirmation()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("left"));
+        QVERIFY(root.mkdir("right"));
+        for (const auto& pair : {qMakePair(QString("left/file"), QByteArray("new")), qMakePair(QString("right/file"), QByteArray("old"))})
+        {
+            QFile file(root.filePath(pair.first));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(pair.second);
+        }
+        MainWindow window(root.filePath("left"), root.filePath("right"), false);
+        auto* panel = window.leftPanel();
+        QTRY_COMPARE(panel->view()->model()->rowCount(panel->view()->rootIndex()), 2);
+        panel->view()->selectionModel()->setCurrentIndex(panel->visibleIndex(root.filePath("left/file")), QItemSelectionModel::NoUpdate);
+        auto* action = window.findChild<QAction*>("copyFiles");
+        auto* controller = window.findChild<CopyController*>();
+        QVERIFY(action->isEnabled());
+        for (const auto* buttonName : {"skipCopy", "replaceCopy"})
+        {
+            action->trigger();
+            auto* dialog = window.findChild<CopyDialog*>("copyDialog");
+            QVERIFY(dialog);
+            dialog->accept();
+            QTRY_VERIFY(window.findChild<QMessageBox*>("copyConflict"));
+            auto* conflict = window.findChild<QMessageBox*>("copyConflict");
+            QFile before(root.filePath("right/file"));
+            QVERIFY(before.open(QIODevice::ReadOnly));
+            QCOMPARE(before.readAll(), QByteArray("old"));
+            before.close();
+            QTest::mouseClick(conflict->findChild<QPushButton*>(buttonName), Qt::LeftButton);
+            QTRY_VERIFY(!controller->isBusy());
+            QTRY_VERIFY(!window.findChild<CopyDialog*>("copyDialog"));
+            QTRY_VERIFY(!window.findChild<QMessageBox*>("copyConflict"));
+        }
+        QFile after(root.filePath("right/file"));
+        QVERIFY(after.open(QIODevice::ReadOnly));
+        QCOMPARE(after.readAll(), QByteArray("new"));
+    }
+    void copyCancelButtonKeepsTheSourceAndRemovesUnfinishedOutput()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("left"));
+        QVERIFY(root.mkdir("right"));
+        QFile file(root.filePath("left/large"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.resize(32 * 1024 * 1024));
+        file.close();
+        MainWindow window(root.filePath("left"), root.filePath("right"), false);
+        auto* panel = window.leftPanel();
+        QTRY_COMPARE(panel->view()->model()->rowCount(panel->view()->rootIndex()), 2);
+        panel->view()->selectionModel()->setCurrentIndex(panel->visibleIndex(file.fileName()), QItemSelectionModel::NoUpdate);
+        window.findChild<QAction*>("copyFiles")->trigger();
+        auto* dialog = window.findChild<CopyDialog*>("copyDialog");
+        QVERIFY(dialog);
+        dialog->accept();
+        auto* progress = window.findChild<CopyProgressDialog*>("copyProgressDialog");
+        QVERIFY(progress);
+        QSignalSpy canceled(progress, &CopyProgressDialog::cancelRequested);
+        auto* controller = window.findChild<CopyController*>();
+        QSignalSpy finished(controller, &CopyController::finished);
+        progress->findChild<QPushButton*>("cancelCopy")->click();
+        QCOMPARE(canceled.size(), 1);
+        QTRY_COMPARE(finished.size(), 1);
+        QVERIFY(root.exists("left/large"));
+        const auto result = qvariant_cast<CopyOperations::Result>(finished.first().first());
+        if (result.completed.isEmpty())
+            QVERIFY(!root.exists("right/large"));
+        else
+            QCOMPARE(QFileInfo(root.filePath("right/large")).size(), qint64(32 * 1024 * 1024));
+        QVERIFY(QDir(root.filePath("right")).entryList({".salamander-copy-*"}, QDir::Hidden | QDir::Dirs | QDir::NoDotAndDotDot).isEmpty());
+    }
+
+    void missingCopyDestinationShowsAnErrorAndKeepsTheSource()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("left"));
+        QVERIFY(root.mkdir("right"));
+        QFile file(root.filePath("left/file"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("original");
+        file.close();
+        MainWindow window(root.filePath("left"), root.filePath("right"), false);
+        auto* panel = window.leftPanel();
+        QTRY_COMPARE(panel->view()->model()->rowCount(panel->view()->rootIndex()), 2);
+        panel->view()->selectionModel()->setCurrentIndex(panel->visibleIndex(file.fileName()), QItemSelectionModel::NoUpdate);
+        window.findChild<QAction*>("copyFiles")->trigger();
+        auto* dialog = window.findChild<CopyDialog*>("copyDialog");
+        QVERIFY(dialog);
+        dialog->findChild<QLineEdit*>("copyDestination")->setText(root.filePath("missing"));
+        dialog->accept();
+        QTRY_VERIFY(window.findChild<QMessageBox*>("copyError"));
+        QVERIFY(root.exists("left/file"));
+        QVERIFY(!root.exists("missing"));
+        QVERIFY(!window.findChild<CopyController*>()->isBusy());
+        window.findChild<QMessageBox*>("copyError")->accept();
+    }
     void screenshotFixture()
     {
         const QString path = qEnvironmentVariable("SALAMANDER_TEST_SCREENSHOT");
@@ -323,6 +470,16 @@ private slots:
         window.leftPanel()->view()->selectionModel()->select(marked, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         QTest::qWait(150);
         QVERIFY(window.grab().save(path));
+        const auto copyPath = qEnvironmentVariable("SALAMANDER_COPY_SCREENSHOT");
+        if (!copyPath.isEmpty())
+        {
+            window.findChild<QAction*>("copyFiles")->trigger();
+            auto* copy = window.findChild<CopyDialog*>("copyDialog");
+            QVERIFY(copy);
+            QTest::qWait(50);
+            QVERIFY(copy->grab().save(copyPath));
+            copy->reject();
+        }
         const auto dialogPath = qEnvironmentVariable("SALAMANDER_DIALOG_SCREENSHOT");
         if (!dialogPath.isEmpty())
         {

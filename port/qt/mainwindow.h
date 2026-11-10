@@ -2,6 +2,8 @@
 #pragma once
 #include <QMainWindow>
 #include "fileoperations.h"
+#include "copyoperations.h"
+#include <QPointer>
 class FilePanel;
 class QAction;
 class QComboBox;
@@ -11,6 +13,9 @@ class QToolBar;
 class QSettings;
 class QLabel;
 class OperationController;
+class CopyController;
+class CopyProgressDialog;
+class QMessageBox;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -25,6 +30,9 @@ protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
+    void copyItems();
+    void finishCopy(const CopyOperations::Result& result);
+    void showCopyConflict(const CopyOperations::Conflict& conflict, quint64 token);
     void createDirectory();
     void renameItems();
     void showRenameDialog();
@@ -47,6 +55,12 @@ private:
     QMenu* favorites_;
     QSettings* settings_;
     OperationController* controller_;
+    CopyController* copyController_;
+    QAction* copyAction_;
+    QPointer<CopyProgressDialog> copyProgress_;
+    QPointer<QMessageBox> copyConflict_;
+    FilePanel* copyTargetPanel_ = nullptr;
+    bool copySession_ = false;
     QAction* renameAction_;
     QAction* createDirectoryAction_;
     QLabel* operationStatus_;

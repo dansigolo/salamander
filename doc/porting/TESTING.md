@@ -66,9 +66,28 @@ Use o lançador de exemplos acima. Todas as mudanças desta seção ficam na pas
 
 As operações são executadas em segundo plano. Os diálogos podem ser cancelados antes do envio; uma chamada atômica já iniciada não é interrompida. Se uma sequência falhar, as renomeações anteriores permanecem e os itens seguintes não são processados. Não há sobrescrita automática. Consulte `OPERATIONS.md` para a política completa.
 
+## Copiar entre painéis — F5
+
+1. Marque `alpha.txt`, `beta.md` e `folder-a` no painel esquerdo. Pressione **F5**: o destino deve ser a pasta do painel direito. Confirme e confira os arquivos e a árvore de pastas no destino. As origens devem continuar no painel esquerdo.
+2. Sem marcas, foque um arquivo e use F5: somente esse item deve ser copiado.
+3. Copie o mesmo arquivo novamente. Em **Skip**, o destino não muda; em **Replace**, ele só é substituído depois da cópia completa. **Skip all** e **Replace all files** valem para os próximos conflitos aplicáveis.
+4. Copie uma pasta cujo nome já exista no destino: ela não será mesclada nesta entrega. Escolha pular ou cancelar, ou use outro destino.
+5. Copie `alpha-link.txt` e um link quebrado, se disponível: os links devem ser preservados como links. O destino do link não deve ser alterado.
+6. Digite um diretório inexistente no diálogo de destino: deve aparecer um erro sem apagar a origem nem criar um destino implícito.
+7. Tente copiar um arquivo para a própria pasta com o mesmo nome, ou uma pasta para dentro dela mesma: a operação deve ser recusada.
+8. Para observar progresso/cancelamento, opcionalmente use:
+
+```sh
+python3 tools/qt_smoke_fixture.py --large-mib 512 --launch
+```
+
+O exemplo acrescenta um arquivo esparso de 512 MiB lógicos. A cópia pode ocupar 512 MiB reais se concluída. Copie-o com F5 e pressione **Cancel** durante a operação. Aguarde o diálogo terminar a limpeza: a origem permanece e o item incompleto não deve aparecer com o nome final. Itens concluídos antes do cancelamento permanecem. Em máquinas rápidas, a cópia pode terminar antes do clique; uma cópia já concluída não é desfeita.
+
+A barra mostra bytes planejados processados, incluindo itens pulados; o resumo final distingue itens copiados e pulados. A atualização é feita por um worker e a interface continua atendendo ao cancelamento. Veja COPYING.md para metadados e limitações.
+
 ## Limitações esperadas nesta etapa
 
-F2 (renomear) e F7 (criar pasta) estão ativos. F3–F6, F8–F9 e F11–F12 permanecem desabilitados: visualizar/editar, copiar, mover, excluir, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
+F2 (renomear), F5 (copiar) e F7 (criar pasta) estão ativos. F3–F4, F6, F8–F9 e F11–F12 permanecem desabilitados: visualizar/editar, mover, excluir, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
 
 ## Testes automatizados
 
@@ -77,7 +96,7 @@ ctest --test-dir build/qt --output-on-failure
 python3 -m unittest discover -s tools/tests -p test_upstream_sync.py -v
 ```
 
-O primeiro comando executa quatro suítes: algoritmo original de máscaras, operações locais, painéis e integração da janela. Elas cobrem histórico, nomes/colunas, `..`, seleção, atalhos, painel ativo, favoritos e atualizações da lista. Os testes gráficos usam o backend Qt `offscreen`; não substituem a conferência no desktop Cinnamon/X11/Wayland.
+O primeiro comando executa cinco suítes: algoritmo original de máscaras, operações locais, cópia, painéis e integração da janela. Elas cobrem histórico, nomes/colunas, `..`, seleção, atalhos, painel ativo, favoritos e atualizações da lista. Os testes gráficos usam o backend Qt `offscreen`; não substituem a conferência no desktop Cinnamon/X11/Wayland.
 
 O segundo comando testa sincronização upstream em repositórios temporários, incluindo isolamento de conflitos. Não acessa a rede nem altera o clone do projeto.
 

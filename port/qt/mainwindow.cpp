@@ -5,6 +5,10 @@
 #include "detailedfilemodel.h"
 #include "namedialog.h"
 #include "operationcontroller.h"
+#include "copycontroller.h"
+#include "copydialogs.h"
+#include <QLocale>
+#include <QPushButton>
 #include <QCloseEvent>
 #include <QTimer>
 #include <QAction>
@@ -42,6 +46,13 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
 {
     setObjectName("salamanderWindow");
     controller_ = new OperationController(this);
+    copyController_ = new CopyController(this);
+    connect(copyController_, &CopyController::busyChanged, this, [this]
+            { updateOperationActions(); });
+    connect(copyController_, &CopyController::progress, this, [this](const CopyOperations::Progress& value)
+            { if (copyProgress_) copyProgress_->updateProgress(value); });
+    connect(copyController_, &CopyController::conflict, this, &MainWindow::showCopyConflict);
+    connect(copyController_, &CopyController::finished, this, &MainWindow::finishCopy);
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -115,11 +126,14 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     QList<QAction*> operations;
     for (int i = 0; i < 7; ++i)
     {
-        auto* action = (i == 0 || i == 5) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
+        auto* action = (i == 0 || i == 3 || i == 5) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
         action->setObjectName(operationNames[i]);
         filesMenu->addAction(action);
         operations.append(action);
     }
+    copyAction_ = operations[3];
+    copyAction_->setShortcut(QKeySequence(Qt::Key_F5));
+    connect(copyAction_, &QAction::triggered, this, &MainWindow::copyItems);
     renameAction_ = operations[0];
     createDirectoryAction_ = operations[5];
     renameAction_->setShortcut(QKeySequence(Qt::Key_F2));
@@ -245,7 +259,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     help->setObjectName("showHelp");
     help->setShortcut(QKeySequence(Qt::Key_F1));
     connect(help, &QAction::triggered, this, [this]
-            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF7: create directory\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
+            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF5: copy to the other panel\nF7: create directory\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
     helpMenu->addAction(help);
     auto* about = helpMenu->addAction(tr("About"));
     connect(about, &QAction::triggered, this, [this]
@@ -322,6 +336,7 @@ MainWindow::~MainWindow()
 {
     disconnect(qApp, nullptr, this, nullptr);
     disconnect(controller_, nullptr, this, nullptr);
+    disconnect(copyController_, nullptr, this, nullptr);
     for (auto* panel : {left_, right_})
     {
         disconnect(panel, nullptr, this, nullptr);
@@ -401,13 +416,14 @@ void MainWindow::updateOperationActions()
 {
     if (!active_)
         return;
-    const bool available = !controller_->isBusy() && !dialogOpen_ && !renameSession_;
+    const bool available = !controller_->isBusy() && !copySession_ && !copyController_->isBusy() && !dialogOpen_ && !renameSession_;
     createDirectoryAction_->setEnabled(available);
     renameAction_->setEnabled(available && !active_->operationNames().isEmpty());
+    copyAction_->setEnabled(available && !active_->operationNames().isEmpty());
 }
 void MainWindow::createDirectory()
 {
-    if (controller_->isBusy() || dialogOpen_ || renameSession_)
+    if (controller_->isBusy() || copySession_ || dialogOpen_ || renameSession_)
         return;
     operationPanel_ = active_;
     operationDirectory_ = active_->currentPath();
@@ -427,7 +443,7 @@ void MainWindow::createDirectory()
 }
 void MainWindow::renameItems()
 {
-    if (controller_->isBusy() || dialogOpen_ || renameSession_)
+    if (controller_->isBusy() || copySession_ || dialogOpen_ || renameSession_)
         return;
     renameNames_ = active_->operationNames();
     if (renameNames_.isEmpty())
@@ -535,6 +551,15 @@ void MainWindow::showOperationError(const FileOperations::Result& result)
 }
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    if (copyController_->isBusy())
+    {
+        if (copyProgress_)
+            copyProgress_->reject();
+        else
+            copyController_->cancel();
+        event->ignore();
+        return;
+    }
     if (controller_->isBusy())
     {
         operationStatus_->setText(tr("Please wait for the current file operation to finish."));
@@ -542,4 +567,99 @@ void MainWindow::closeEvent(QCloseEvent* event)
         return;
     }
     QMainWindow::closeEvent(event);
+}
+
+void MainWindow::copyItems()
+{
+    if (controller_->isBusy() || copySession_ || dialogOpen_ || renameSession_)
+        return;
+    const auto names = active_->operationNames();
+    if (names.isEmpty())
+        return;
+    const auto source = active_->currentPath();
+    copyTargetPanel_ = active_ == left_ ? right_ : left_;
+    auto* dialog = new CopyDialog(source, names, copyTargetPanel_->currentPath(), this);
+    dialogOpen_ = true;
+    updateOperationActions();
+    connect(dialog, &QDialog::accepted, this, [this, dialog, source, names]
+            {
+        dialogOpen_ = false;
+        copySession_ = true;
+        copyProgress_ = new CopyProgressDialog(this);
+        connect(copyProgress_, &CopyProgressDialog::cancelRequested, copyController_, &CopyController::cancel);
+        copyProgress_->open();
+        copyController_->start({source, names, dialog->destination()});
+        updateOperationActions(); });
+    connect(dialog, &QDialog::rejected, this, [this]
+            { dialogOpen_ = false; updateOperationActions(); });
+    dialog->open();
+}
+void MainWindow::showCopyConflict(const CopyOperations::Conflict& value, quint64 token)
+{
+    if (!copyController_->isBusy() || !copyProgress_)
+        return;
+    auto* message = new QMessageBox(QMessageBox::Question, tr("Destination already exists"), QString(), QMessageBox::NoButton, copyProgress_);
+    copyConflict_ = message;
+    message->setObjectName("copyConflict");
+    message->setAttribute(Qt::WA_DeleteOnClose);
+    message->setWindowModality(Qt::WindowModal);
+    message->setTextFormat(Qt::PlainText);
+    message->setText(value.source + "\n→ " + value.destination + "\n\n" + (value.replaceAllowed ? tr("Replace the existing file or skip this item?") : tr("This destination will not be replaced or merged. Skip this item or cancel.")));
+    QPushButton* replace = nullptr;
+    QPushButton* replaceAll = nullptr;
+    if (value.replaceAllowed)
+    {
+        replace = message->addButton(tr("Replace"), QMessageBox::AcceptRole);
+        replace->setObjectName("replaceCopy");
+        replaceAll = message->addButton(tr("Replace all files"), QMessageBox::AcceptRole);
+        replaceAll->setObjectName("replaceAllCopy");
+    }
+    auto* skip = message->addButton(tr("Skip"), QMessageBox::ActionRole);
+    skip->setObjectName("skipCopy");
+    auto* skipAll = message->addButton(tr("Skip all"), QMessageBox::ActionRole);
+    skipAll->setObjectName("skipAllCopy");
+    auto* cancel = message->addButton(tr("Cancel copy"), QMessageBox::RejectRole);
+    cancel->setObjectName("cancelCopyConflict");
+    message->setDefaultButton(cancel);
+    message->setEscapeButton(cancel);
+    connect(message, &QDialog::finished, this, [this, message, replace, replaceAll, skip, skipAll, token]
+            {
+        auto decision = CopyOperations::Decision::Cancel;
+        auto* clicked = message->clickedButton();
+        if (replace && clicked == replace) decision = CopyOperations::Decision::Replace;
+        else if (replaceAll && clicked == replaceAll) decision = CopyOperations::Decision::ReplaceAll;
+        else if (clicked == skip) decision = CopyOperations::Decision::Skip;
+        else if (clicked == skipAll) decision = CopyOperations::Decision::SkipAll;
+        copyController_->resolve(decision, token); });
+    message->open();
+}
+void MainWindow::finishCopy(const CopyOperations::Result& result)
+{
+    if (copyConflict_)
+        copyConflict_->reject();
+    if (copyProgress_)
+        copyProgress_->complete();
+    copyProgress_ = nullptr;
+    copyConflict_ = nullptr;
+    copySession_ = false;
+    left_->refreshStorageInfo();
+    right_->refreshStorageInfo();
+    if (copyTargetPanel_ && copyTargetPanel_->currentPath() == result.request.destinationDirectory && !result.completed.isEmpty())
+        copyTargetPanel_->focusEntry(result.completed.last());
+    operationStatus_->setText((result.canceled ? tr("Copy canceled. ") : QString()) + tr("Copied entries: %1 (%2); skipped: %3.").arg(result.completed.size()).arg(QLocale().formattedDataSize(result.bytesCopied)).arg(result.skipped.size()));
+    operationStatus_->show();
+    const int generation = ++statusGeneration_;
+    QTimer::singleShot(8000, this, [this, generation]
+                       { if (generation == statusGeneration_ && !copySession_ && !controller_->isBusy() && !dialogOpen_ && !renameSession_) operationStatus_->hide(); });
+    if (!result.error.isEmpty() || !result.cleanupError.isEmpty())
+    {
+        auto* message = new QMessageBox(QMessageBox::Warning, tr("Copy incomplete"), QString(), QMessageBox::Ok, this);
+        message->setObjectName("copyError");
+        message->setAttribute(Qt::WA_DeleteOnClose);
+        message->setWindowModality(Qt::WindowModal);
+        message->setTextFormat(Qt::PlainText);
+        message->setText(result.error + "\n" + result.cleanupError + tr("\n\nCompleted selected entries: %1; skipped: %2. Sources were not deleted.").arg(result.completed.size()).arg(result.skipped.size()));
+        message->open();
+    }
+    updateOperationActions();
 }

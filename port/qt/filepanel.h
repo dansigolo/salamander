@@ -28,6 +28,7 @@ public:
     QStringList selectedPaths() const;
     QStringList operationNames() const;
     void focusEntry(const QString& name, bool mark = false);
+    void refreshStorageInfo() { refreshSpace(); }
     void setPreserveSelectionOnNavigation(bool enabled);
     bool preservesSelectionOnNavigation() const { return preserveSelection_; }
     void setHiddenFilesVisible(bool visible);
@@ -78,4 +79,5 @@ private:
     QString pendingFocus_;
     QSet<QString> pendingMarks_;
     bool applyingPendingFocus_ = false;
+    int spaceGeneration_ = 0;
 };

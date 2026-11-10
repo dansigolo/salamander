@@ -1,5 +1,16 @@
 # Qt port development log
 
+## F5 copy milestone
+
+- Copy marked entries or focus to the other panel, with an editable destination and asynchronous progress/cancel dialogs.
+- Scan source trees without following links, stage each selected entry privately and publish completed entries atomically.
+- Add Replace/Replace all files, Skip/Skip all and Cancel decisions; keep existing directories intact without merging.
+- Detect self/descendant destinations, ordinary source changes, special files and destination races.
+- Preserve basic file/directory permissions and timestamps; recreate symlinks verbatim.
+- Retain completed entries on cancellation/failure, remove unfinished staging and report cleanup failures explicitly.
+- Add backend and UI regressions, copy policy documentation and optional large sparse manual fixtures.
+
+
 ## Local operations
 
 - Enable F7 single-directory creation and F2 rename through shared menu/toolbar/keyboard actions.

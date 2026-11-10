@@ -335,12 +335,13 @@ void FilePanel::setActive(bool active)
 void FilePanel::refreshSpace()
 {
     const auto path = currentPath_;
+    const auto generation = ++spaceGeneration_;
     space_->setText(tr("…"));
     auto* watcher = new QFutureWatcher<QPair<QString, QString>>(this);
-    connect(watcher, &QFutureWatcher<QPair<QString, QString>>::finished, this, [this, watcher, path]
+    connect(watcher, &QFutureWatcher<QPair<QString, QString>>::finished, this, [this, watcher, path, generation]
             {
         const auto result = watcher->result();
-        if (path == currentPath_)
+        if (path == currentPath_ && generation == spaceGeneration_)
         {
             space_->setText(result.first);
             space_->setToolTip(result.second);

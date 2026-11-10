@@ -12,7 +12,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--launch', action='store_true', help='Open the built Qt application with both fixture panels')
     parser.add_argument('--binary', type=Path, default=Path(__file__).resolve().parents[1] / 'build/qt/salamander-qt')
+    parser.add_argument('--large-mib', type=int, default=0, help='Add a sparse file for copy/cancellation tests (0..4096 MiB)')
     args = parser.parse_args()
+    if not 0 <= args.large_mib <= 4096:
+        parser.error('--large-mib must be between 0 and 4096')
     binary = args.binary.resolve()
     if args.launch and not binary.is_file():
         parser.error(f'Build the application first; binary not found: {binary}')
@@ -37,6 +40,9 @@ def main():
     (left / 'run-me.sh').chmod(0o755)
     (left / 'alpha-link.txt').symlink_to('alpha.txt')
     (right / 'README.txt').write_text('Independent right panel\n')
+    if args.large_mib:
+        with (left / 'large-copy-test.bin').open('wb') as large:
+            large.truncate(args.large_mib * 1024 * 1024)
     command = [str(binary), str(left), str(right)]
     print(f'Test directory: {root}', flush=True)
     print('Launch: ' + shlex.join(command), flush=True)
