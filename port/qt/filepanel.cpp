@@ -12,6 +12,7 @@
 #include <QtConcurrent>
 #include <QLocale>
 #include <QSignalBlocker>
+#include <QScopedValueRollback>
 #include <QEvent>
 #include <QScrollBar>
 #include <QAbstractItemView>
@@ -107,6 +108,12 @@ FilePanel::FilePanel(const QString& path, QWidget* parent) : QWidget(parent)
             restoreLocation(true); });
     connect(sorted_, &QAbstractItemModel::rowsInserted, this, [this]
             { restoreLocation(false); });
+    connect(sorted_, &QAbstractItemModel::rowsInserted, this, [this]
+            { applyPendingFocus(); });
+    connect(sorted_, &QAbstractItemModel::layoutChanged, this, [this]
+            { applyPendingFocus(); });
+    connect(model_, &QFileSystemModel::directoryLoaded, this, [this]
+            { applyPendingFocus(); });
     if (!navigate(path))
         navigate(QDir::homePath());
     for (auto* child : findChildren<QWidget*>())
@@ -149,6 +156,8 @@ bool FilePanel::navigateInternal(const QString& path, int historyTarget)
         return true;
     }
     saveLocation();
+    pendingFocus_.clear();
+    pendingMarks_.clear();
     view_->clearSearch();
     currentPath_ = destination;
     restoring_ = false;
@@ -211,7 +220,12 @@ void FilePanel::saveLocation()
     LocationState state;
     state.focused = model_->filePath(sourceIndex(view_->currentIndex()));
     if (preserveSelection_)
+    {
         state.selected = selectedPaths();
+        for (const auto& path : pendingMarks_)
+            if (!state.selected.contains(path))
+                state.selected.append(path);
+    }
     state.scroll = view_->verticalScrollBar()->value();
     locations_[currentPath_] = state;
 }
@@ -351,4 +365,50 @@ void FilePanel::setPreserveSelectionOnNavigation(bool enabled)
     if (!enabled)
         for (auto& location : locations_)
             location.selected.clear();
+}
+
+QStringList FilePanel::operationNames() const
+{
+    auto entries = view_->selectionModel()->selectedRows();
+    if (entries.isEmpty() && view_->currentIndex().isValid())
+        entries.append(view_->currentIndex().siblingAtColumn(0));
+    QStringList names;
+    for (const auto& index : entries)
+        if (index.isValid() && index.parent() == view_->rootIndex() && index.flags().testFlag(Qt::ItemIsSelectable))
+            names.append(index.data(QFileSystemModel::FileNameRole).toString());
+    return names;
+}
+void FilePanel::focusEntry(const QString& name, bool mark)
+{
+    pendingFocus_ = QDir(currentPath_).filePath(name);
+    if (mark)
+        pendingMarks_.insert(pendingFocus_);
+    applyPendingFocus();
+}
+void FilePanel::applyPendingFocus()
+{
+    if ((pendingFocus_.isEmpty() && pendingMarks_.isEmpty()) || restoring_ || applyingPendingFocus_)
+        return;
+    QScopedValueRollback<bool> guard(applyingPendingFocus_, true);
+    const auto pending = pendingMarks_.values();
+    for (const auto& path : pending)
+    {
+        const auto index = visibleIndex(path);
+        if (index.isValid() && index.parent() == view_->rootIndex())
+        {
+            pendingMarks_.remove(path);
+            view_->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+    }
+    if (!pendingFocus_.isEmpty())
+    {
+        const auto index = visibleIndex(pendingFocus_);
+        if (index.isValid() && index.parent() == view_->rootIndex())
+        {
+            pendingFocus_.clear();
+            view_->selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
+            view_->scrollTo(index);
+        }
+    }
+    updateStatus();
 }

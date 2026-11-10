@@ -3,6 +3,10 @@
 #include "filepanel.h"
 #include "fileview.h"
 #include "detailedfilemodel.h"
+#include "namedialog.h"
+#include "operationcontroller.h"
+#include <QCloseEvent>
+#include <QTimer>
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
@@ -37,6 +41,7 @@ QAction* MainWindow::unavailable(const QString& text, const QString& name)
 MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool inspectVolumes, QSettings* settings) : settings_(settings ? settings : new QSettings(this))
 {
     setObjectName("salamanderWindow");
+    controller_ = new OperationController(this);
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -48,6 +53,11 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     right_->setObjectName("rightPanel");
     splitter->setSizes({680, 680});
     layout->addWidget(splitter, 1);
+    operationStatus_ = new QLabel(central);
+    operationStatus_->setObjectName("operationStatus");
+    operationStatus_->setTextFormat(Qt::PlainText);
+    operationStatus_->hide();
+    layout->addWidget(operationStatus_);
     auto* locationRow = new QHBoxLayout;
     locationRow->setContentsMargins(4, 0, 4, 0);
     locationRow->addWidget(new QLabel(tr("Go to:"), central));
@@ -105,18 +115,31 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     QList<QAction*> operations;
     for (int i = 0; i < 7; ++i)
     {
-        auto* action = unavailable(operationTexts[i], operationNames[i]);
+        auto* action = (i == 0 || i == 5) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
+        action->setObjectName(operationNames[i]);
         filesMenu->addAction(action);
         operations.append(action);
     }
-    for (int i : {0, 3, 4, 6})
+    renameAction_ = operations[0];
+    createDirectoryAction_ = operations[5];
+    renameAction_->setShortcut(QKeySequence(Qt::Key_F2));
+    createDirectoryAction_->setShortcut(QKeySequence(Qt::Key_F7));
+    connect(renameAction_, &QAction::triggered, this, &MainWindow::renameItems);
+    connect(createDirectoryAction_, &QAction::triggered, this, &MainWindow::createDirectory);
+    connect(controller_, &OperationController::busyChanged, this, [this](bool busy)
+            {
+        if (busy) ++statusGeneration_;
+        operationStatus_->setVisible(busy);
+        updateOperationActions(); });
+    connect(controller_, &OperationController::finished, this, &MainWindow::finishOperation);
+    for (int i : {0, 3, 4, 5, 6})
     {
         operations[i]->setIcon(style()->standardIcon(i == 6 ? QStyle::SP_TrashIcon : QStyle::SP_FileIcon));
         top->addAction(operations[i]);
     }
     auto* quit = filesMenu->addAction(tr("Quit"));
     quit->setShortcut(QKeySequence::Quit);
-    connect(quit, &QAction::triggered, qApp, &QApplication::quit);
+    connect(quit, &QAction::triggered, this, &QWidget::close);
     auto* all = editMenu->addAction(tr("Select all"));
     all->setObjectName("selectAll");
     auto* none = editMenu->addAction(tr("Unselect all"));
@@ -222,7 +245,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     help->setObjectName("showHelp");
     help->setShortcut(QKeySequence(Qt::Key_F1));
     connect(help, &QAction::triggered, this, [this]
-            { QMessageBox::information(this, tr("Keyboard navigation"), tr("Tab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
+            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF7: create directory\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
     helpMenu->addAction(help);
     auto* about = helpMenu->addAction(tr("About"));
     connect(about, &QAction::triggered, this, [this]
@@ -249,7 +272,10 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     {
         auto* button = new QToolButton(functionBar);
         button->setDefaultAction(keys[i]);
-        button->setText(QString("F%1 %2").arg(i + 1).arg(labels[i]));
+        const auto text = QString("F%1 %2").arg(i + 1).arg(labels[i]);
+        button->setText(text);
+        connect(keys[i], &QAction::changed, button, [button, text]
+                { button->setText(text); });
         button->setToolButtonStyle(Qt::ToolButtonTextOnly);
         functionBar->addWidget(button);
     }
@@ -271,6 +297,10 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     {
         connect(panel, &FilePanel::panelActivated, this, [this, panel]
                 { setActivePanel(panel); });
+        connect(panel->view()->selectionModel(), &QItemSelectionModel::currentChanged, this, [this]
+                { updateOperationActions(); });
+        connect(panel->view()->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this]
+                { updateOperationActions(); });
         connect(panel, &FilePanel::pathChanged, this, [this]
                 { updateNavigation(); });
         auto* other = panel == left_ ? right_ : left_;
@@ -288,7 +318,16 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
         loadVolumes();
 }
 
-MainWindow::~MainWindow() { disconnect(qApp, nullptr, this, nullptr); }
+MainWindow::~MainWindow()
+{
+    disconnect(qApp, nullptr, this, nullptr);
+    disconnect(controller_, nullptr, this, nullptr);
+    for (auto* panel : {left_, right_})
+    {
+        disconnect(panel, nullptr, this, nullptr);
+        disconnect(panel->view()->selectionModel(), nullptr, this, nullptr);
+    }
+}
 
 void MainWindow::setActivePanel(FilePanel* panel)
 {
@@ -301,6 +340,7 @@ void MainWindow::updateNavigation()
 {
     if (!active_)
         return;
+    updateOperationActions();
     back_->setEnabled(active_->canGoBack());
     forward_->setEnabled(active_->canGoForward());
     setWindowTitle(active_->currentPath() + tr(" — Open Salamander Linux"));
@@ -355,4 +395,151 @@ void MainWindow::loadVolumes()
         watcher->deleteLater(); });
     watcher->setFuture(QtConcurrent::run([]
                                          { return QStorageInfo::mountedVolumes(); }));
+}
+
+void MainWindow::updateOperationActions()
+{
+    if (!active_)
+        return;
+    const bool available = !controller_->isBusy() && !dialogOpen_ && !renameSession_;
+    createDirectoryAction_->setEnabled(available);
+    renameAction_->setEnabled(available && !active_->operationNames().isEmpty());
+}
+void MainWindow::createDirectory()
+{
+    if (controller_->isBusy() || dialogOpen_ || renameSession_)
+        return;
+    operationPanel_ = active_;
+    operationDirectory_ = active_->currentPath();
+    auto* dialog = new NameDialog(tr("Make directory"), tr("Create a directory in:\n%1").arg(operationDirectory_), {}, this);
+    dialogOpen_ = true;
+    updateOperationActions();
+    connect(dialog, &QDialog::accepted, this, [this, dialog]
+            {
+        dialogOpen_ = false;
+        operationStatus_->setText(tr("Creating directory…"));
+        controller_->start({FileOperations::Kind::CreateDirectory, operationDirectory_, {}, dialog->name()}); });
+    connect(dialog, &QDialog::rejected, this, [this]
+            {
+        dialogOpen_ = false;
+        updateOperationActions(); });
+    dialog->open();
+}
+void MainWindow::renameItems()
+{
+    if (controller_->isBusy() || dialogOpen_ || renameSession_)
+        return;
+    renameNames_ = active_->operationNames();
+    if (renameNames_.isEmpty())
+        return;
+    operationPanel_ = active_;
+    operationDirectory_ = active_->currentPath();
+    renameMarked_ = !active_->selectedPaths().isEmpty();
+    renamePosition_ = 0;
+    renameCompleted_ = 0;
+    renameSession_ = true;
+    showRenameDialog();
+}
+void MainWindow::showRenameDialog()
+{
+    if (renamePosition_ >= renameNames_.size())
+    {
+        renameSession_ = false;
+        renameNames_.clear();
+        updateOperationActions();
+        return;
+    }
+    auto* dialog = new NameDialog(tr("Rename — %1 of %2").arg(renamePosition_ + 1).arg(renameNames_.size()),
+                                  tr("Rename %1 in:\n%2").arg(renameNames_[renamePosition_], operationDirectory_), renameNames_[renamePosition_], this);
+    dialogOpen_ = true;
+    updateOperationActions();
+    connect(dialog, &QDialog::accepted, this, [this, dialog]
+            {
+        dialogOpen_ = false;
+        operationStatus_->setText(tr("Renaming %1…").arg(renameNames_[renamePosition_]));
+        controller_->start({FileOperations::Kind::Rename, operationDirectory_, renameNames_[renamePosition_], dialog->name()}); });
+    connect(dialog, &QDialog::rejected, this, [this]
+            {
+        dialogOpen_ = false;
+        renameSession_ = false;
+        renameNames_.clear();
+        updateOperationActions(); });
+    dialog->open();
+}
+void MainWindow::finishOperation(const FileOperations::Result& result)
+{
+    if (!result.succeeded())
+    {
+        showOperationError(result);
+        renameSession_ = false;
+        renameNames_.clear();
+        updateOperationActions();
+        return;
+    }
+    if (operationPanel_->currentPath() == result.request.directory)
+    {
+        operationPanel_->focusEntry(result.request.targetName, result.request.kind == FileOperations::Kind::Rename && renameMarked_);
+        if (active_ == operationPanel_)
+            operationPanel_->view()->setFocus();
+    }
+    operationStatus_->setText(result.request.kind == FileOperations::Kind::CreateDirectory ? tr("Directory created: %1").arg(result.request.targetName) : (result.request.sourceName == result.request.targetName ? tr("Name unchanged: %1").arg(result.request.targetName) : tr("Renamed %1 to %2").arg(result.request.sourceName, result.request.targetName)));
+    operationStatus_->show();
+    const int generation = ++statusGeneration_;
+    QTimer::singleShot(5000, this, [this, generation]
+                       {
+        if (generation == statusGeneration_ && !controller_->isBusy() && !dialogOpen_ && !renameSession_)
+            operationStatus_->hide(); });
+    if (result.request.kind == FileOperations::Kind::Rename)
+    {
+        if (result.request.sourceName != result.request.targetName)
+            ++renameCompleted_;
+        ++renamePosition_;
+        showRenameDialog();
+    }
+    updateOperationActions();
+}
+void MainWindow::showOperationError(const FileOperations::Result& result)
+{
+    QString explanation;
+    switch (result.error)
+    {
+    case FileOperations::Error::AlreadyExists:
+        explanation = tr("An entry with this name already exists. Nothing was replaced.");
+        break;
+    case FileOperations::Error::PermissionDenied:
+        explanation = tr("Permission denied or the filesystem is read-only.");
+        break;
+    case FileOperations::Error::NotFound:
+        explanation = tr("The source item or parent directory is no longer available.");
+        break;
+    case FileOperations::Error::Unsupported:
+        explanation = tr("This filesystem or system does not support the required operation.");
+        break;
+    default:
+        explanation = result.message;
+        break;
+    }
+    auto* message = new QMessageBox(QMessageBox::Warning, tr("File operation failed"), QString(), QMessageBox::Ok, this);
+    message->setObjectName("operationError");
+    message->setAttribute(Qt::WA_DeleteOnClose);
+    message->setWindowModality(Qt::WindowModal);
+    message->setTextFormat(Qt::PlainText);
+    QString text = explanation + "\n\n" + QDir(result.request.directory).filePath(result.request.targetName);
+    if (result.request.kind == FileOperations::Kind::Rename)
+        text += tr("\nOriginal name: %1").arg(result.request.sourceName);
+    if (renameSession_ && renameCompleted_ > 0)
+        text += tr("\n\nCompleted renames: %1. Remaining items were not changed.").arg(renameCompleted_);
+    message->setText(text);
+    message->setDetailedText(result.message);
+    message->open();
+}
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    if (controller_->isBusy())
+    {
+        operationStatus_->setText(tr("Please wait for the current file operation to finish."));
+        event->ignore();
+        return;
+    }
+    QMainWindow::closeEvent(event);
 }

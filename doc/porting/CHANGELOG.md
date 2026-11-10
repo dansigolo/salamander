@@ -1,5 +1,15 @@
 # Qt port development log
 
+## Local operations
+
+- Enable F7 single-directory creation and F2 rename through shared menu/toolbar/keyboard actions.
+- Add a Widgets-independent Linux backend and asynchronous controller; serialize jobs per window.
+- Refuse existing destinations atomically, including dangling symlinks, and rename source symlinks without touching targets.
+- Rename marked entries through sequential prompts; cancellation/errors leave completed entries applied and skip the remainder.
+- Validate names, report native failures and follow results with panel focus without redirecting navigation.
+- Add backend collision/race/permission/symlink tests, full-window operation tests and manual test instructions.
+
+
 ## Selection policy (2026-11-09)
 
 - Match the user-observed Altap 4.0 behavior: clear marks when changing directories while restoring navigation focus.

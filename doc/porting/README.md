@@ -16,7 +16,7 @@ Status: experimental native Linux Qt port. Altap Salamander 4.0 x64 is the funct
 
 ## Implemented so far
 
-Two independent directory panels, path entry, marked items separate from focus, Insert/Space toggle-and-advance, Shift navigation selection, Ctrl+A/Ctrl+D, prefix quick search, directories-first sorting, directory activation, parent navigation, hidden-file toggle and focused-panel switching. Each panel remembers focus for visited directories. Marks clear on directory changes by default; Options > Preserve selection when changing directories enables session-only selection memory. That preference is persisted across application restarts. Directory enumeration uses QFileSystemModel. Editing and drag/drop are disabled. No file-operation commands exist.
+Two independent directory panels, path entry, marked items separate from focus, Insert/Space toggle-and-advance, Shift navigation selection, Ctrl+A/Ctrl+D, prefix quick search, directories-first sorting, directory activation, parent navigation, hidden-file toggle and focused-panel switching. Each panel remembers focus for visited directories. Marks clear on directory changes by default; Options > Preserve selection when changing directories enables session-only selection memory. That preference is persisted across application restarts. Directory enumeration uses QFileSystemModel. Editing and drag/drop are disabled. F2 rename and F7 mkdir now run through a background operation service; see [OPERATIONS.md](OPERATIONS.md).
 
 `port/core/mask.cpp` extracts `PrepareMask` from `src/masks.cpp` at upstream commit `a201fa3cc708c74dc1f4eea7032e0758840447a1`, removing the diagnostic macro and changing only the function name/namespace. The algorithm is tested independently of Qt. It is not yet wired into the UI: complete wildcard matching and Unicode policy remain open.
 
@@ -71,6 +71,10 @@ Development branch: `improvement/salamander_for_linux`. Keep focused commits, ru
 
 ## Interface milestone
 
-The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. Unimplemented file operations are disabled.
+The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename and F7 mkdir are enabled; remaining file operations are disabled.
 
 See [TESTING.md](TESTING.md) for compilation, disposable fixtures and a complete manual/automated test guide. Optional fixture launcher: `python3 tools/qt_smoke_fixture.py --launch`.
+
+## Local file operations
+
+See [OPERATIONS.md](OPERATIONS.md) for backend boundaries and exact policies. F2 uses marked items (one prompt per entry), falling back to focus; F7 creates a single directory. Both refuse existing destinations. The backend is Linux-specific and currently requires support for non-replacing atomic rename. Tests use temporary directories exclusively.

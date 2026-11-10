@@ -51,9 +51,24 @@ Desligar a opção de preservar marcações não desmarca imediatamente os itens
 
 Backspace edita o prefixo quando a busca rápida está ativa. Pressione Esc antes de usá-lo para subir uma pasta. Ctrl+A em um campo de texto mantém a seleção de texto normal.
 
+## Criar e renomear — F7 e F2
+
+Use o lançador de exemplos acima. Todas as mudanças desta seção ficam na pasta temporária criada por ele.
+
+1. No painel esquerdo, pressione **F7**, digite `Nova pasta á` e confirme. A pasta deve aparecer e receber o foco; o painel direito mantém seu caminho.
+2. Com essa pasta em foco e sem itens marcados, pressione **F2**, escolha `Pasta renomeada` e confirme. O conteúdo é mantido e o foco acompanha o novo nome.
+3. Tente criar novamente uma pasta ou renomear um arquivo para um nome existente. Um erro deve aparecer; o destino e o arquivo original permanecem intactos.
+4. Marque dois arquivos com Insert e pressione F2. A aplicação pede um novo nome para cada item. Cancele o segundo diálogo: a primeira renomeação permanece e o segundo arquivo fica com o nome original.
+5. Abra F7 e cancele: nada deve ser criado. Tente nomes vazios, `..` e `pasta/filha`: o diálogo deve pedir correção sem alterar o disco. Este F7 cria apenas um nível por vez.
+6. Renomeie `alpha-link.txt`: o nome do link muda, e o destino `alpha.txt` continua intacto. Também é possível renomear links quebrados.
+7. Crie `.pasta-oculta`: a mensagem confirma a criação; use Ctrl+H se o filtro estiver ocultando o resultado.
+8. Verifique a barra inferior e os menus Files: os mesmos comandos F2/F7 devem funcionar por clique e teclado, mantendo os rótulos ao habilitar/desabilitar ações.
+
+As operações são executadas em segundo plano. Os diálogos podem ser cancelados antes do envio; uma chamada atômica já iniciada não é interrompida. Se uma sequência falhar, as renomeações anteriores permanecem e os itens seguintes não são processados. Não há sobrescrita automática. Consulte `OPERATIONS.md` para a política completa.
+
 ## Limitações esperadas nesta etapa
 
-As ações F2–F9 e F11–F12 aparecem desabilitadas: renomear, visualizar/editar, copiar, mover, criar/excluir pastas, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
+F2 (renomear) e F7 (criar pasta) estão ativos. F3–F6, F8–F9 e F11–F12 permanecem desabilitados: visualizar/editar, copiar, mover, excluir, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
 
 ## Testes automatizados
 
@@ -62,7 +77,7 @@ ctest --test-dir build/qt --output-on-failure
 python3 -m unittest discover -s tools/tests -p test_upstream_sync.py -v
 ```
 
-O primeiro comando executa três suítes: algoritmo original de máscaras, painéis e integração da janela. Elas cobrem histórico, nomes/colunas, `..`, seleção, atalhos, painel ativo, favoritos e atualizações da lista. Os testes gráficos usam o backend Qt `offscreen`; não substituem a conferência no desktop Cinnamon/X11/Wayland.
+O primeiro comando executa quatro suítes: algoritmo original de máscaras, operações locais, painéis e integração da janela. Elas cobrem histórico, nomes/colunas, `..`, seleção, atalhos, painel ativo, favoritos e atualizações da lista. Os testes gráficos usam o backend Qt `offscreen`; não substituem a conferência no desktop Cinnamon/X11/Wayland.
 
 O segundo comando testa sincronização upstream em repositórios temporários, incluindo isolamento de conflitos. Não acessa a rede nem altera o clone do projeto.
 

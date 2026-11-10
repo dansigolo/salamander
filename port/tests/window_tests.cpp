@@ -3,10 +3,18 @@
 #include "filepanel.h"
 #include "fileview.h"
 #include "detailedfilemodel.h"
+#include "namedialog.h"
+#include "operationcontroller.h"
+#include <QDialogButtonBox>
+#include <QPushButton>
+#include <QMessageBox>
+#include <QPointer>
 #include <QAction>
 #include <QComboBox>
 #include <QDir>
 #include <QFile>
+#include <QFileSystemModel>
+#include <QSignalSpy>
 #include <QHeaderView>
 #include <QLineEdit>
 #include <QMenuBar>
@@ -87,7 +95,7 @@ private slots:
             QCOMPARE(window.menuBar()->actions()[i]->text(), names[i]);
         for (const auto* name : {"topToolbar", "placesToolbar", "functionToolbar"})
             QVERIFY(window.findChild<QToolBar*>(name));
-        for (const auto* name : {"renameFiles", "copyFiles", "moveFiles", "makeDirectory", "deleteFiles", "userMenu", "connectNetwork", "disconnectNetwork"})
+        for (const auto* name : {"copyFiles", "moveFiles", "deleteFiles", "userMenu", "connectNetwork", "disconnectNetwork"})
         {
             auto* action = window.findChild<QAction*>(name);
             QVERIFY(action);
@@ -128,6 +136,170 @@ private slots:
         QVERIFY(!window.leftPanel()->preservesSelectionOnNavigation());
         QVERIFY(!window.rightPanel()->preservesSelectionOnNavigation());
     }
+
+    void createDirectoryWithF7AndRenameWithF2()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("left"));
+        QVERIFY(root.mkdir("right"));
+        MainWindow window(root.filePath("left"), root.filePath("right"), false);
+        window.show();
+        window.activateWindow();
+        auto* panel = window.leftPanel();
+        panel->view()->setFocus();
+        QTRY_VERIFY(panel->view()->hasFocus());
+        QTest::keyClick(panel->view(), Qt::Key_F7);
+        QPointer<NameDialog> dialog = window.findChild<NameDialog*>("operationNameDialog");
+        QVERIFY(dialog);
+        QVERIFY(!window.findChild<QAction*>("makeDirectory")->isEnabled());
+        auto* input = dialog->findChild<QLineEdit*>("operationName");
+        input->setText("bad/nested");
+        dialog->accept();
+        QVERIFY(dialog->isVisible());
+        QVERIFY(!root.exists("left/bad"));
+        input->setText(QString::fromUtf8("nova pasta á"));
+        dialog->accept();
+        QVERIFY(!window.close()); // A submitted atomic job must finish before closing.
+        QTRY_VERIFY(QFileInfo(root.filePath(QString::fromUtf8("left/nova pasta á"))).isDir());
+        QTRY_COMPARE(panel->view()->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString::fromUtf8("nova pasta á"));
+        QTRY_VERIFY(window.findChild<QAction*>("renameFiles")->isEnabled());
+        QTRY_VERIFY(!dialog);
+        window.activateWindow();
+        panel->view()->setFocus();
+        QTRY_VERIFY(panel->view()->hasFocus());
+        QTest::keyClick(panel->view(), Qt::Key_F2);
+        QTRY_VERIFY(window.findChild<NameDialog*>("operationNameDialog"));
+        auto* rename = window.findChild<NameDialog*>("operationNameDialog");
+        rename->findChild<QLineEdit*>("operationName")->setText("renamed folder");
+        rename->accept();
+        QTRY_VERIFY(root.exists("left/renamed folder"));
+        QTRY_COMPARE(panel->view()->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("renamed folder"));
+        QVERIFY(!root.exists(QString::fromUtf8("left/nova pasta á")));
+        QVERIFY(!root.exists("right/renamed folder"));
+        auto* bar = window.findChild<QToolBar*>("functionToolbar");
+        bool f2 = false, f7 = false;
+        for (auto* button : bar->findChildren<QToolButton*>())
+        {
+            if (button->defaultAction() == window.findChild<QAction*>("renameFiles"))
+                f2 = button->text().startsWith("F2 ");
+            if (button->defaultAction() == window.findChild<QAction*>("makeDirectory"))
+                f7 = button->text().startsWith("F7 ");
+        }
+        QVERIFY(f2 && f7);
+    }
+    void cancelAndCollisionDoNotChangeExistingFiles()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QFile file(root.filePath("existing.txt"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("keep me");
+        file.close();
+        MainWindow window(root.path(), root.path(), false);
+        auto* controller = window.findChild<OperationController*>();
+        QVERIFY(controller);
+        QSignalSpy finished(controller, &OperationController::finished);
+        window.findChild<QAction*>("makeDirectory")->trigger();
+        auto* cancel = window.findChild<NameDialog*>("operationNameDialog");
+        QVERIFY(cancel);
+        cancel->findChild<QLineEdit*>("operationName")->setText("canceled");
+        cancel->reject();
+        QTRY_VERIFY(!window.findChild<NameDialog*>("operationNameDialog"));
+        QVERIFY(!root.exists("canceled"));
+        QCOMPARE(finished.size(), 0);
+        window.findChild<QAction*>("makeDirectory")->trigger();
+        auto* collision = window.findChild<NameDialog*>("operationNameDialog");
+        QVERIFY(collision);
+        collision->findChild<QLineEdit*>("operationName")->setText("existing.txt");
+        collision->accept();
+        QTRY_VERIFY(window.findChild<QMessageBox*>("operationError"));
+        auto* message = window.findChild<QMessageBox*>("operationError");
+        QVERIFY(message->text().contains("already exists"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("keep me"));
+        message->accept();
+    }
+    void markedRenamesProceedOneAtATimeAndCancelTheRemainder()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        for (const auto* name : {"a.txt", "b.txt"})
+        {
+            QFile file(root.filePath(name));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(name);
+        }
+        MainWindow window(root.path(), root.path(), false);
+        auto* panel = window.leftPanel();
+        QTRY_COMPARE(panel->view()->model()->rowCount(panel->view()->rootIndex()), 3);
+        for (const auto* name : {"a.txt", "b.txt"})
+            panel->view()->selectionModel()->select(panel->visibleIndex(root.filePath(name)), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        auto* action = window.findChild<QAction*>("renameFiles");
+        QVERIFY(action->isEnabled());
+        action->trigger();
+        auto* first = window.findChild<NameDialog*>("operationNameDialog");
+        QVERIFY(first);
+        QCOMPARE(first->findChild<QLineEdit*>("operationName")->text(), QString("a.txt"));
+        first->findChild<QLineEdit*>("operationName")->setText("changed.txt");
+        first->accept();
+        QTRY_VERIFY(root.exists("changed.txt"));
+        NameDialog* second = nullptr;
+        QTRY_VERIFY(([&]
+                     {
+            for (auto* dialog : window.findChildren<NameDialog*>("operationNameDialog"))
+                if (dialog->isVisible() && dialog->findChild<QLineEdit*>("operationName")->text() == "b.txt") second = dialog;
+            return second != nullptr; })());
+        second->reject();
+        QTRY_VERIFY(action->isEnabled());
+        QVERIFY(!root.exists("a.txt"));
+        QVERIFY(root.exists("b.txt"));
+        QVERIFY(root.exists("changed.txt"));
+    }
+
+    void renameFailureStopsTheSessionAndKeepsCompletedResults()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        for (const auto* name : {"a.txt", "b.txt", "c.txt", "d.txt"})
+        {
+            QFile file(root.filePath(name));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(name);
+        }
+        MainWindow window(root.path(), root.path(), false);
+        auto* panel = window.leftPanel();
+        QTRY_COMPARE(panel->view()->model()->rowCount(panel->view()->rootIndex()), 5);
+        for (const auto* name : {"a.txt", "b.txt", "c.txt", "d.txt"})
+            panel->view()->selectionModel()->select(panel->visibleIndex(root.filePath(name)), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        window.findChild<QAction*>("renameFiles")->trigger();
+        for (const auto& pair : {qMakePair(QString("a.txt"), QString("first.txt")), qMakePair(QString("b.txt"), QString("second.txt")), qMakePair(QString("c.txt"), QString("first.txt"))})
+        {
+            NameDialog* current = nullptr;
+            QTRY_VERIFY(([&]
+                         {
+                for (auto* dialog : window.findChildren<NameDialog*>("operationNameDialog"))
+                    if (dialog->isVisible() && dialog->findChild<QLineEdit*>("operationName")->text() == pair.first) current = dialog;
+                return current != nullptr; })());
+            current->findChild<QLineEdit*>("operationName")->setText(pair.second);
+            current->accept();
+        }
+        QTRY_VERIFY(window.findChild<QMessageBox*>("operationError"));
+        auto* message = window.findChild<QMessageBox*>("operationError");
+        QVERIFY(message->text().contains("Completed renames: 2"));
+        message->accept();
+        QVERIFY(root.exists("first.txt"));
+        QVERIFY(root.exists("second.txt"));
+        QVERIFY(root.exists("c.txt"));
+        QVERIFY(root.exists("d.txt"));
+        QVERIFY(!root.exists("a.txt"));
+        QVERIFY(!root.exists("b.txt"));
+        QTRY_COMPARE(panel->selectedPaths().size(), 4);
+    }
     void screenshotFixture()
     {
         const QString path = qEnvironmentVariable("SALAMANDER_TEST_SCREENSHOT");
@@ -151,6 +323,17 @@ private slots:
         window.leftPanel()->view()->selectionModel()->select(marked, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         QTest::qWait(150);
         QVERIFY(window.grab().save(path));
+        const auto dialogPath = qEnvironmentVariable("SALAMANDER_DIALOG_SCREENSHOT");
+        if (!dialogPath.isEmpty())
+        {
+            window.findChild<QAction*>("makeDirectory")->trigger();
+            auto* dialog = window.findChild<NameDialog*>("operationNameDialog");
+            QVERIFY(dialog);
+            dialog->findChild<QLineEdit*>("operationName")->setText(QString::fromUtf8("nova pasta á"));
+            QTest::qWait(50);
+            QVERIFY(dialog->grab().save(dialogPath));
+            dialog->reject();
+        }
     }
 };
 QTEST_MAIN(WindowTests)

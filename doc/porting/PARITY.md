@@ -20,7 +20,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Parent-directory `..` row | Partial | Enter navigates up; always first and excluded from marks; further original edge cases remain |
 | Status lines and selection totals | Partial | Focused metadata, marked count and file bytes implemented; recursive directory sizes pending |
 | Command line | Pending | Working directory, history, quoting, shell integration |
-| Bottom function-key bar | Partial | F1 Help/F10 Menu work; F2–F9/F11–F12 shown disabled until the operations exist |
+| Bottom function-key bar | Partial | F1/F2/F7/F10 work; remaining keys disabled until their operations exist |
 | Focus separate from selected items | Partial | Keyboard covered; mouse/rubber-band modes and visual indicators pending |
 | Insert and Space | Partial | Toggle and advance; background directory-size calculation pending |
 | Shift+navigation | Partial | Select/unselect ranges; detailed keyboard fixtures added; other view modes pending |
@@ -32,7 +32,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Navigation focus/selection memory | Partial | Focus memory retained; marks clear on navigation by default, with a persisted opt-in for session selection memory; large/slow/removable filesystem tests pending |
 | Hidden files | Partial | Native Qt semantics; Linux dot files and Windows hidden attribute fixtures |
 | View modes / zoom / thumbnails | Pending | Detailed, brief, icons, thumbnails, tiles and associated settings |
-| Copy/move/rename/mkdir/delete/trash | Pending | Background service with overwrite/cancel/error/symlink policies |
+| Copy/move/rename/mkdir/delete/trash | Partial | F2 rename and F7 mkdir use background jobs and atomic non-replacement; copy/move/trash pending; see OPERATIONS.md |
 | Filesystem watching and refresh | Partial | QFileSystemModel watching with selection-preservation regression; reconnect/slow-storage tests pending |
 | Search/find dialog | Pending | Content/metadata searches, results actions, cancel and progress |
 | Internal viewer / external editor | Pending | Text/binary modes, encodings and associations |
@@ -60,3 +60,7 @@ Automated tests are necessary but do not establish visual parity. Linux desktop 
 ## Interface milestone — 2026-11-08
 
 See `TESTING.md` for the manual acceptance checklist and fixture launcher. `port/tests/window_tests.cpp` covers shared actions/shortcuts, active-panel routing, favorites, menu order and unavailable operations. `DetailedFileModel` adds six presentation columns while preserving persistent selection indexes across source-model changes.
+
+## Local operations milestone
+
+F7 creates a single directory in the active location. F2 renames marked entries one at a time, or the focused entry. Original mass-rename masks, multi-level mkdir and remaining file operations are not yet implemented. Read OPERATIONS.md for collision, symlink, cancellation and partial-session policies.

@@ -26,6 +26,8 @@ public:
     bool canGoForward() const;
     void setActive(bool active);
     QStringList selectedPaths() const;
+    QStringList operationNames() const;
+    void focusEntry(const QString& name, bool mark = false);
     void setPreserveSelectionOnNavigation(bool enabled);
     bool preservesSelectionOnNavigation() const { return preserveSelection_; }
     void setHiddenFilesVisible(bool visible);
@@ -55,6 +57,7 @@ private:
     void saveLocation();
     void restoreLocation(bool loaded);
     void updateStatus();
+    void applyPendingFocus();
     QFileSystemModel* model_;
     DirectorySortModel* sorted_;
     DetailedFileModel* details_;
@@ -72,4 +75,7 @@ private:
     QSet<QString> loaded_;
     bool restoring_ = false;
     bool preserveSelection_ = false;
+    QString pendingFocus_;
+    QSet<QString> pendingMarks_;
+    bool applyingPendingFocus_ = false;
 };
