@@ -20,7 +20,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Parent-directory `..` row | Partial | Enter navigates up; always first and excluded from marks; further original edge cases remain |
 | Status lines and selection totals | Partial | Focused metadata, marked count and file bytes implemented; recursive directory sizes pending |
 | Command line | Pending | Working directory, history, quoting, shell integration |
-| Bottom function-key bar | Partial | F1/F2/F5/F7/F10 work; remaining keys disabled until their operations exist |
+| Bottom function-key bar | Partial | F1/F2/F5/F6/F7/F10 work; remaining keys disabled until their operations exist |
 | Focus separate from selected items | Partial | Keyboard covered; mouse/rubber-band modes and visual indicators pending |
 | Insert and Space | Partial | Toggle and advance; background directory-size calculation pending |
 | Shift+navigation | Partial | Select/unselect ranges; detailed keyboard fixtures added; other view modes pending |
@@ -32,7 +32,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Navigation focus/selection memory | Partial | Focus memory retained; marks clear on navigation by default, with a persisted opt-in for session selection memory; large/slow/removable filesystem tests pending |
 | Hidden files | Partial | Native Qt semantics; Linux dot files and Windows hidden attribute fixtures |
 | View modes / zoom / thumbnails | Pending | Detailed, brief, icons, thumbnails, tiles and associated settings |
-| Copy/move/rename/mkdir/delete/trash | Partial | F2/F7 and F5 copy run in background; F5 has staging, progress, cancel and file conflict decisions; directory merging, move/trash pending; see OPERATIONS.md and COPYING.md |
+| Copy/move/rename/mkdir/delete/trash | Partial | F2/F7, F5 copy and F6 move run in background; native rename or verified EXDEV copy/removal, progress, cancellation and explicit file conflicts; directory merging, trash/delete and complete metadata support pending; see OPERATIONS.md, COPYING.md and MOVING.md |
 | Filesystem watching and refresh | Partial | QFileSystemModel watching with selection-preservation regression; reconnect/slow-storage tests pending |
 | Search/find dialog | Pending | Content/metadata searches, results actions, cancel and progress |
 | Internal viewer / external editor | Pending | Text/binary modes, encodings and associations |

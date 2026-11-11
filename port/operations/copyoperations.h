@@ -10,6 +10,7 @@ namespace CopyOperations
         QString sourceDirectory;
         QStringList names;
         QString destinationDirectory;
+        bool move = false;
     };
     enum class Decision
     {
@@ -25,6 +26,19 @@ namespace CopyOperations
         QString destination;
         bool replaceAllowed = false;
     };
+    enum class Phase
+    {
+        Copying,
+        Moving,
+        Verifying,
+        RemovingSource
+    };
+    struct PublishedEntry
+    {
+        QString name;
+        quint64 device = 0;
+        quint64 inode = 0;
+    };
     struct Progress
     {
         bool scanning = true;
@@ -34,6 +48,8 @@ namespace CopyOperations
         int completed = 0;
         int skipped = 0;
         int total = 0;
+        Phase phase = Phase::Copying;
+        int removedEntries = 0;
     };
     struct Result
     {
@@ -44,6 +60,10 @@ namespace CopyOperations
         bool canceled = false;
         QString error;
         QString cleanupError;
+        QList<PublishedEntry> published;
+        QStringList retained;
+        QStringList partialSources;
+        QStringList recoveryPaths;
     };
     struct Callbacks
     {
@@ -51,8 +71,8 @@ namespace CopyOperations
         std::function<void(const Progress&)> progress;
         std::function<Decision(const Conflict&)> conflict;
     };
-    // Linux worker-only entry point. Sources are never deleted. Each selected
-    // entry is staged privately and published atomically after it is complete.
+    // Worker-only transfer entry point. Copy preserves sources; move uses native
+    // rename or a verified cross-filesystem copy/removal pipeline.
     Result execute(const Request& request, const Callbacks& callbacks = {});
 } // namespace CopyOperations
 Q_DECLARE_METATYPE(CopyOperations::Progress)

@@ -1,5 +1,14 @@
 # Qt port development log
 
+## F6 move milestone
+
+- Enable F6 through shared menus, toolbar and keyboard actions, with the other panel as default destination.
+- Preserve inodes on native renames; use verified staged copies and checked source cleanup for EXDEV.
+- Share explicit conflict decisions, cooperative cancellation and background progress with F5.
+- Report retained copies, partial sources and recovery paths; never overwrite a competing source name during restoration.
+- Refuse unsupported cross-filesystem metadata instead of silently discarding it.
+- Add actual cross-filesystem backend regressions and F6 interface tests.
+
 ## F5 copy milestone
 
 - Copy marked entries or focus to the other panel, with an editable destination and asynchronous progress/cancel dialogs.

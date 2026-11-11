@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <memory>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <vector>
@@ -70,6 +71,9 @@ namespace CopyOperations
             };
             std::vector<Node> children;
             qint64 bytes = 0;
+            struct stat destinationMetadata
+            {
+            };
         };
         bool identity(const struct stat& a, const struct stat& b) { return a.st_dev == b.st_dev && a.st_ino == b.st_ino; }
         bool unchanged(const struct stat& a, const struct stat& b)
@@ -264,13 +268,18 @@ namespace CopyOperations
                 if (present)
                     *present = true;
                 if (identity(existing, node.metadata))
-                    throw Failure{QStringLiteral("Cannot copy an item onto itself: ") + display};
+                    throw Failure{QStringLiteral("Source and destination refer to the same item: ") + display};
                 const bool allowed = !S_ISDIR(node.metadata.st_mode) && (S_ISREG(existing.st_mode) || S_ISLNK(existing.st_mode));
+                return choose({QDir(request.sourceDirectory).filePath(QFile::decodeName(node.name)), display, allowed});
+            }
+            Decision choose(const Conflict& value)
+            {
+                const bool allowed = value.replaceAllowed;
                 if (skipAll)
                     return Decision::Skip;
                 if (replaceAll && allowed)
                     return Decision::Replace;
-                const auto answer = callbacks.conflict ? callbacks.conflict({QDir(request.sourceDirectory).filePath(QFile::decodeName(node.name)), display, allowed}) : Decision::Cancel;
+                const auto answer = callbacks.conflict ? callbacks.conflict(value) : Decision::Cancel;
                 if (answer == Decision::SkipAll)
                 {
                     skipAll = true;
@@ -282,7 +291,7 @@ namespace CopyOperations
                     return Decision::Replace;
                 }
                 if ((answer == Decision::Replace || answer == Decision::ReplaceAll) && !allowed)
-                    throw Failure{QStringLiteral("Replacing or merging directories is not supported: ") + display};
+                    throw Failure{QStringLiteral("Replacing or merging directories is not supported: ") + value.destination};
                 return answer;
             }
         };
@@ -359,9 +368,12 @@ namespace CopyOperations
                     break;
             }
         }
+#include "moveoperations_linux.inc"
     } // namespace
     Result execute(const Request& request, const Callbacks& callbacks)
     {
+        if (request.move)
+            return executeMove(request, callbacks);
         Job job{request, callbacks, {}, {request}};
         QByteArray stage;
         try
@@ -419,6 +431,9 @@ namespace CopyOperations
                         throw Failure{nativeError(targetPath)};
                     job.copy(source.n, node, staging.n, "entry", QDir(request.sourceDirectory).filePath(name));
                     job.canceled();
+                    struct stat payloadIdentity;
+                    if (::fstatat(staging.n, "entry", &payloadIdentity, AT_SYMLINK_NOFOLLOW))
+                        throw Failure{nativeError(targetPath)};
                     bool published = false;
                     while (true)
                     {
@@ -444,7 +459,7 @@ namespace CopyOperations
                             throw Failure{nativeError(targetPath)};
                         }
                         if (identity(current, node.metadata))
-                            throw Failure{QStringLiteral("Cannot copy an item onto itself: ") + targetPath};
+                            throw Failure{QStringLiteral("Source and destination refer to the same item: ") + targetPath};
                         if (S_ISDIR(node.metadata.st_mode) || (!S_ISREG(current.st_mode) && !S_ISLNK(current.st_mode)))
                             throw Failure{QStringLiteral("Destination type changed or cannot be replaced: ") + targetPath};
                         if (::renameat(staging.n, "entry", destination.n, node.name.constData()))
@@ -460,6 +475,7 @@ namespace CopyOperations
                     else
                     {
                         job.result.completed.append(name);
+                        job.result.published.append({name, quint64(payloadIdentity.st_dev), quint64(payloadIdentity.st_ino)});
                         ++job.progress.completed;
                         job.result.bytesCopied += node.bytes;
                         if (::fsync(destination.n))

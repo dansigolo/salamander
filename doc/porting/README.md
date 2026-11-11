@@ -71,7 +71,7 @@ Development branch: `improvement/salamander_for_linux`. Keep focused commits, ru
 
 ## Interface milestone
 
-The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F5 copy and F7 mkdir are enabled; remaining file operations are disabled.
+The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F5 copy, F6 move and F7 mkdir are enabled; remaining file operations are disabled.
 
 See [TESTING.md](TESTING.md) for compilation, disposable fixtures and a complete manual/automated test guide. Optional fixture launcher: `python3 tools/qt_smoke_fixture.py --launch`.
 
@@ -82,3 +82,7 @@ See [OPERATIONS.md](OPERATIONS.md) for backend boundaries and exact policies. F2
 ## F5 copy milestone
 
 F5 copies marked entries (or focus) to the other panel, with an editable existing destination, background progress, cooperative cancellation and explicit file replacement/skip choices. Files, directory trees, hidden children and symlinks are supported. Completed entries remain after cancellation and unfinished staging is cleaned. Existing directories are not merged. See [COPYING.md](COPYING.md) and [TESTING.md](TESTING.md).
+
+## F6 move milestone
+
+F6 moves to the other panel with native renames on the same filesystem. EXDEV uses staged copying, byte/metadata verification and checked source removal, with explicit partial/recovery reporting. Existing directories are not merged. See [MOVING.md](MOVING.md) for cancellation, metadata restrictions and recovery; [TESTING.md](TESTING.md) covers manual validation.

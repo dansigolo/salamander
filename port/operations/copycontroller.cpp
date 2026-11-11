@@ -67,10 +67,12 @@ bool CopyController::start(const CopyOperations::Request& request)
         callbacks.canceled = [state] { return state->canceled.load(); };
         QElapsedTimer timer;
         bool scanning = true;
-        callbacks.progress = [this, token, &timer, &scanning](const CopyOperations::Progress& value) {
-            if (timer.isValid() && timer.elapsed() < 40 && scanning == value.scanning) return;
+        auto phase = CopyOperations::Phase::Copying;
+        callbacks.progress = [this, token, &timer, &scanning, &phase](const CopyOperations::Progress& value) {
+            if (timer.isValid() && timer.elapsed() < 40 && scanning == value.scanning && phase == value.phase) return;
             timer.start();
             scanning = value.scanning;
+            phase = value.phase;
             QMetaObject::invokeMethod(this, [this, value, token] { if (busy_ && generation_ == token) emit progress(value); }, Qt::QueuedConnection);
         };
         callbacks.conflict = [this, state, token](const CopyOperations::Conflict& value) {

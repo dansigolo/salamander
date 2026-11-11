@@ -87,7 +87,7 @@ A barra mostra bytes planejados processados, incluindo itens pulados; o resumo f
 
 ## Limitações esperadas nesta etapa
 
-F2 (renomear), F5 (copiar) e F7 (criar pasta) estão ativos. F3–F4, F6, F8–F9 e F11–F12 permanecem desabilitados: visualizar/editar, mover, excluir, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
+F2 (renomear), F5 (copiar), F6 (mover) e F7 (criar pasta) estão ativos. F3–F4, F8–F9 e F11–F12 permanecem desabilitados: visualizar/editar, excluir, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
 
 ## Testes automatizados
 
@@ -113,3 +113,16 @@ A consulta upstream usa a rede para atualizar as referências do remote oficial,
 ## Como relatar um problema
 
 Registre o commit (`git rev-parse --short HEAD`), o ambiente gráfico (X11/Wayland), os passos, o resultado esperado e o observado. Diga em qual painel ocorreu e se a busca rápida estava ativa. Uma captura da janela ajuda a comparar o layout com o Altap 4.0; confira o conteúdo visível antes de compartilhar.
+
+## Mover entre painéis — F6
+
+Use somente a fixture descartável (`python3 tools/qt_smoke_fixture.py --launch`).
+
+1. Marque um arquivo e uma pasta na esquerda; pressione **F6**. Confira o destino da direita e confirme. Os itens devem desaparecer da origem e aparecer completos no destino; itens não marcados permanecem.
+2. Sem marcas, foque um item e repita. Cancele o diálogo inicial: nenhuma mudança deve acontecer.
+3. Crie arquivos com o mesmo nome nos dois painéis. Confira **Skip** (ambos preservados), **Replace** (destino substituído e origem removida) e **Cancel move**. Pastas existentes não oferecem substituição nem mesclagem.
+4. Para EXDEV real, escolha uma pasta de testes em outro sistema de arquivos (por exemplo, `/dev/shm`, se houver espaço). Confira conteúdo, links e remoção da origem. Um caminho diferente na mesma partição não testa EXDEV.
+5. Cancele um arquivo grande durante a cópia/verificação: a origem deve permanecer; uma cópia já publicada pode permanecer também, indicada no resultado. Durante a remoção verificada, o cancelamento aguarda o item atual terminar.
+6. Leia os avisos de erro: eles distinguem origem mantida, origem parcial e caminho privado de recuperação. Não apague caminhos de recuperação antes de inspecioná-los. Restrições de ACL/xattrs, hardlinks e metadados estão em `MOVING.md`.
+
+A suíte `file_move` usa dois sistemas de arquivos reais. Por padrão o destino é `/dev/shm/salamander-move-tests`; se necessário, rode `SALAMANDER_MOVE_TEST_DESTINATION=/pasta/em/outro/filesystem ctest --test-dir build/qt --output-on-failure`. A suíte falha quando não consegue exercitar EXDEV; não ignora silenciosamente esse cenário.

@@ -10,7 +10,7 @@ class CopyDialog : public QDialog
 {
     Q_OBJECT
 public:
-    CopyDialog(const QString& source, const QStringList& names, const QString& destination, QWidget* parent = nullptr);
+    CopyDialog(const QString& source, const QStringList& names, const QString& destination, QWidget* parent = nullptr, bool moving = false);
     QString destination() const;
     void accept() override;
 
@@ -22,7 +22,7 @@ class CopyProgressDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit CopyProgressDialog(QWidget* parent = nullptr);
+    explicit CopyProgressDialog(QWidget* parent = nullptr, bool moving = false);
     void updateProgress(const CopyOperations::Progress& progress);
     void complete();
     void reject() override;
@@ -34,4 +34,5 @@ private:
     QProgressBar* bar_;
     QPushButton* cancel_;
     bool canceled_ = false;
+    bool moving_ = false;
 };

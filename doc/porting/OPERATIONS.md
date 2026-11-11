@@ -1,6 +1,6 @@
 # Local operations: first milestone
 
-Implemented: F7 creates a single directory in the active panel; F2 renames marked entries, or the focused entry if there are no marks. Menus, toolbar and function-key controls share the same actions. F5 copying is described in COPYING.md. Move, trash and permanent delete remain disabled.
+Implemented: F7 creates a single directory in the active panel; F2 renames marked entries, or the focused entry if there are no marks. Menus, toolbar and function-key controls share the same actions. F5 copying is described in COPYING.md. F6 moving is described in MOVING.md. Trash and permanent delete remain disabled.
 
 ## Architecture
 

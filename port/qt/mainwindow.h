@@ -30,7 +30,7 @@ protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
-    void copyItems();
+    void copyItems(bool moving = false);
     void finishCopy(const CopyOperations::Result& result);
     void showCopyConflict(const CopyOperations::Conflict& conflict, quint64 token);
     void createDirectory();
@@ -57,6 +57,8 @@ private:
     OperationController* controller_;
     CopyController* copyController_;
     QAction* copyAction_;
+    QAction* moveAction_;
+    bool movingSession_ = false;
     QPointer<CopyProgressDialog> copyProgress_;
     QPointer<QMessageBox> copyConflict_;
     FilePanel* copyTargetPanel_ = nullptr;
