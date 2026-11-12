@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mainwindow.h"
+#include "textviewer.h"
 #include "appearance.h"
 #include "filepanel.h"
 #include "fileview.h"
@@ -127,11 +128,15 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     QList<QAction*> operations;
     for (int i = 0; i < 7; ++i)
     {
-        auto* action = (i == 0 || i == 3 || i == 4 || i == 5 || i == 6) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
+        auto* action = (i != 2) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
         action->setObjectName(operationNames[i]);
         filesMenu->addAction(action);
         operations.append(action);
     }
+    viewAction_ = operations[1];
+    viewAction_->setShortcut(QKeySequence(Qt::Key_F3));
+    viewAction_->setAutoRepeat(false);
+    connect(viewAction_, &QAction::triggered, this, &MainWindow::viewFile);
     copyAction_ = operations[3];
     copyAction_->setShortcut(QKeySequence(Qt::Key_F5));
     connect(copyAction_, &QAction::triggered, this, [this]
@@ -155,7 +160,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
         operationStatus_->setVisible(busy);
         updateOperationActions(); });
     connect(controller_, &OperationController::finished, this, &MainWindow::finishOperation);
-    for (int i : {0, 3, 4, 5, 6})
+    for (int i : {0, 1, 3, 4, 5, 6})
     {
         operations[i]->setIcon(style()->standardIcon(i == 6 ? QStyle::SP_TrashIcon : QStyle::SP_FileIcon));
         top->addAction(operations[i]);
@@ -283,7 +288,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     help->setObjectName("showHelp");
     help->setShortcut(QKeySequence(Qt::Key_F1));
     connect(help, &QAction::triggered, this, [this]
-            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF5: copy to the other panel\nF6: move to the other panel\nF7: create directory\nF8: move to Trash\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
+            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF3: view the focused file\nF5: copy to the other panel\nF6: move to the other panel\nF7: create directory\nF8: move to Trash\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
     helpMenu->addAction(help);
     auto* about = helpMenu->addAction(tr("About"));
     connect(about, &QAction::triggered, this, [this]
@@ -442,12 +447,20 @@ void MainWindow::updateOperationActions()
         return;
     const bool available = !controller_->isBusy() && !copySession_ && !copyController_->isBusy() && !dialogOpen_ && !renameSession_;
     createDirectoryAction_->setEnabled(available);
+    viewAction_->setEnabled(!active_->focusedFile().isEmpty());
     const bool hasItems = available && !active_->operationNames().isEmpty();
     renameAction_->setEnabled(hasItems);
     copyAction_->setEnabled(hasItems);
     moveAction_->setEnabled(hasItems);
     trashAction_->setEnabled(hasItems);
 }
+void MainWindow::viewFile()
+{
+    const auto path = active_->focusedFile();
+    if (!path.isEmpty())
+        (new TextViewer(path, this))->show();
+}
+
 void MainWindow::trashItems()
 {
     if (!trashAction_->isEnabled())

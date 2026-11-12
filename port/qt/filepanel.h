@@ -27,6 +27,7 @@ public:
     void setActive(bool active);
     QStringList selectedPaths() const;
     QStringList operationNames() const;
+    QString focusedFile() const;
     QString neighborName(const QStringList& excluded) const;
     void focusEntry(const QString& name, bool mark = false);
     void refreshStorageInfo() { refreshSpace(); }

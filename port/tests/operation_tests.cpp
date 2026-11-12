@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "fileoperations.h"
 #include "operationcontroller.h"
+#include "textpreview.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -10,6 +11,7 @@
 #include <atomic>
 #include <thread>
 #include <unistd.h>
+#include <sys/stat.h>
 using namespace FileOperations;
 class OperationTests : public QObject
 {
@@ -25,6 +27,58 @@ class OperationTests : public QObject
         return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
     }
 private slots:
+    void previewDecodesTextAndKeepsTheOriginalBytes()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const auto file = root.filePath("texto.txt");
+        const auto utf16 = QByteArray::fromHex("fffe6100e7000a00");
+        QVERIFY(write(file, utf16));
+        auto result = TextPreview::read(file);
+        QVERIFY2(result.error.isEmpty(), qPrintable(result.error));
+        QCOMPARE(result.text, QString::fromUtf8("aç\n"));
+        QCOMPARE(result.encoding, QString("UTF-16"));
+        QCOMPARE(read(file), utf16);
+
+        QVERIFY(write(file, QByteArray::fromHex("636166e9")));
+        result = TextPreview::read(file);
+        QVERIFY2(result.error.isEmpty(), qPrintable(result.error));
+        QCOMPARE(result.text, QString::fromUtf8("café"));
+        QCOMPARE(result.encoding, QString("ISO-8859-1"));
+
+        QVERIFY(write(file, {}));
+        result = TextPreview::read(file);
+        QVERIFY(result.error.isEmpty());
+        QVERIFY(result.text.isEmpty());
+        QVERIFY(!result.truncated);
+    }
+
+    void previewLimitsBytesAndRejectsBinaryAndSpecialFiles()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const auto file = root.filePath("large.txt");
+        QByteArray text(TextPreview::byteLimit - 1, 'a');
+        text += QString::fromUtf8("ç").toUtf8(); // Character crosses the preview boundary.
+        QVERIFY(write(file, text));
+        const auto link = root.filePath("link");
+        QVERIFY(QFile::link(file, link));
+        auto result = TextPreview::read(link);
+        QVERIFY2(result.error.isEmpty(), qPrintable(result.error));
+        QVERIFY(result.truncated);
+        QCOMPARE(result.encoding, QString("UTF-8"));
+        QCOMPARE(result.text.size(), TextPreview::byteLimit - 1);
+        QCOMPARE(result.text.back(), QChar('a'));
+
+        QVERIFY(write(file, QByteArray("binary\0data", 11)));
+        QVERIFY(!TextPreview::read(file).error.isEmpty());
+        const auto fifo = root.filePath("pipe");
+        QCOMPARE(::mkfifo(QFile::encodeName(fifo).constData(), 0600), 0);
+        QVERIFY(!TextPreview::read(fifo).error.isEmpty());
+        QVERIFY(!TextPreview::read(root.path()).error.isEmpty());
+        QVERIFY(!TextPreview::read(root.filePath("missing")).error.isEmpty());
+    }
+
     void createUnicodeFolderAndRefuseAllExistingEntryTypes()
     {
         QTemporaryDir root;

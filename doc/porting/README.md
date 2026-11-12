@@ -71,7 +71,7 @@ Development branch: `improvement/salamander_for_linux`. Keep focused commits, ru
 
 ## Interface milestone
 
-The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F5 copy, F6 move, F7 mkdir and F8 Trash are enabled; remaining file operations are disabled.
+The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F3 view, F5 copy, F6 move, F7 mkdir and F8 Trash are enabled; remaining file operations are disabled.
 
 See [TESTING.md](TESTING.md) for compilation, disposable fixtures and a complete manual/automated test guide. Optional fixture launcher: `python3 tools/qt_smoke_fixture.py --launch`.
 
@@ -88,3 +88,6 @@ F5 copies marked entries (or focus) to the other panel, with an editable existin
 F6 moves to the other panel with native renames on the same filesystem. EXDEV uses staged copying, byte/metadata verification and checked source removal, with explicit partial/recovery reporting. Existing directories are not merged. See [MOVING.md](MOVING.md) for cancellation, metadata restrictions and recovery; [TESTING.md](TESTING.md) covers manual validation.
 
 The appearance dialog, custom theme format and Full Row Select are documented in [APPEARANCE.md](APPEARANCE.md).
+
+
+F3 follows the upstream focused-file shortcut. The internal viewer opens a read-only window and reads up to the first 1 MiB of a regular file in a worker. It supports UTF-8, BOM-marked UTF-16 and a labeled ISO-8859-1 fallback. The reader follows links to regular files and rejects special files. Common binary files are identified by control characters in the decoded preview. Search and word wrap apply to the displayed text.

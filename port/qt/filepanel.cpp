@@ -371,6 +371,17 @@ void FilePanel::setPreserveSelectionOnNavigation(bool enabled)
             location.selected.clear();
 }
 
+QString FilePanel::focusedFile() const
+{
+    const auto item = view_->currentIndex().siblingAtColumn(0);
+    if (!item.isValid() || item.parent() != view_->rootIndex() || !item.flags().testFlag(Qt::ItemIsSelectable))
+        return {};
+    const auto index = sourceIndex(item);
+    if (!index.isValid() || model_->isDir(index))
+        return {};
+    return model_->filePath(index);
+}
+
 QStringList FilePanel::operationNames() const
 {
     auto entries = view_->selectionModel()->selectedRows();

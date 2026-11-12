@@ -16,6 +16,8 @@
 #include <QMessageBox>
 #include <QPointer>
 #include <QPaintEvent>
+#include <QPlainTextEdit>
+#include <QLabel>
 #include <QStandardItemModel>
 #include <QAction>
 #include <QComboBox>
@@ -496,6 +498,64 @@ private slots:
         QVERIFY(!root.exists("a.txt"));
         QVERIFY(!root.exists("b.txt"));
         QTRY_COMPARE(panel->selectedPaths().size(), 4);
+    }
+
+    void f3ViewsTheFocusedFileAndSearchesWithoutEditing()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("folder"));
+        QFile file(root.filePath("preview.txt"));
+        const auto content = QString::fromUtf8("Café e <b>texto</b>\nUma linha\nOutro Café\n");
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(content.toUtf8()), content.toUtf8().size());
+        file.close();
+        QSettings settings(temporary.filePath("settings.ini"), QSettings::IniFormat);
+        MainWindow window(root.path(), root.path(), false, &settings);
+        window.show();
+        window.activateWindow();
+        auto* panel = window.leftPanel();
+        auto* view = panel->view();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        QTRY_VERIFY(panel->visibleIndex(file.fileName()).isValid());
+        QTRY_VERIFY(panel->visibleIndex(root.filePath("folder")).isValid());
+        const auto folder = panel->visibleIndex(root.filePath("folder"));
+        view->selectionModel()->setCurrentIndex(folder, QItemSelectionModel::NoUpdate);
+        auto* viewAction = window.findChild<QAction*>("viewFile");
+        QVERIFY(viewAction);
+        QVERIFY(!viewAction->isEnabled());
+        view->selectionModel()->select(folder, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        view->selectionModel()->setCurrentIndex(panel->visibleIndex(file.fileName()), QItemSelectionModel::NoUpdate);
+        QVERIFY(viewAction->isEnabled());
+        QTest::keyClick(view, Qt::Key_F3);
+        auto* viewer = window.findChild<QDialog*>("textViewer");
+        QVERIFY(viewer);
+        auto* text = viewer->findChild<QPlainTextEdit*>("viewerText");
+        QVERIFY(text && text->isReadOnly());
+        QTRY_COMPARE(text->toPlainText(), content);
+        QVERIFY(viewer->findChild<QLabel*>("viewerStatus")->text().contains("UTF-8"));
+        viewer->activateWindow();
+        text->setFocus();
+        QTRY_VERIFY(text->hasFocus());
+        QTest::keyClick(text, Qt::Key_F, Qt::ControlModifier);
+        auto* search = viewer->findChild<QLineEdit*>("viewerSearch");
+        QVERIFY(search->hasFocus());
+        const auto term = QString::fromUtf8("Café");
+        search->setText(term);
+        QTest::keyClick(search, Qt::Key_Return);
+        QCOMPARE(text->textCursor().selectedText(), term);
+        QCOMPARE(text->textCursor().selectionStart(), 0);
+        QTest::keyClick(text, Qt::Key_F3);
+        QCOMPARE(text->textCursor().selectionStart(), content.lastIndexOf(term));
+        QTest::keyClick(text, Qt::Key_F3);
+        QCOMPARE(text->textCursor().selectionStart(), 0);
+        QTest::keyClick(text, Qt::Key_Escape);
+        QTRY_VERIFY(!window.findChild<QDialog*>("textViewer"));
+        QCOMPARE(panel->selectedPaths(), QStringList{root.filePath("folder")});
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), content.toUtf8());
     }
 
     void f8ConfirmsAndTrashesMarkedItemsWithRestoreMetadata()
