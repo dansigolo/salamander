@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build qt6-base-dev qt6-base-dev-tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build qt6-base-dev qt6-base-dev-tools libglib2.0-bin
       - name: Configure
         run: cmake -S . -B build/qt -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build

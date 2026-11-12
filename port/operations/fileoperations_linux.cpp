@@ -5,6 +5,10 @@
 #include "fileoperations.h"
 #include <QDir>
 #include <QFile>
+#include <QProcess>
+#include <QSet>
+#include <QStandardPaths>
+#include <QStorageInfo>
 #include <cerrno>
 #include <system_error>
 #include <fcntl.h>
@@ -56,6 +60,63 @@ namespace FileOperations
             const auto message = std::system_category().message(error);
             return {request, category, QString::fromLocal8Bit(message.data(), message.size())};
         }
+        bool insideTrash(const QString& directory)
+        {
+            const auto data = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+            const auto mount = QStorageInfo(directory).rootPath();
+            const auto uid = QString::number(::getuid());
+            const QStringList roots = {QDir(data).filePath("Trash"), QDir(mount).filePath(".Trash/" + uid), QDir(mount).filePath(".Trash-" + uid)};
+            for (const auto& root : roots)
+            {
+                const auto canonical = QDir(root).canonicalPath();
+                if (!canonical.isEmpty() && (directory == canonical || directory.startsWith(canonical + '/')))
+                    return true;
+            }
+            return false;
+        }
+
+        Result trash(const Request& request)
+        {
+            Result result{request};
+            if (request.names.isEmpty())
+                return {request, Error::InvalidName, QStringLiteral("Choose at least one item.")};
+            QSet<QString> unique;
+            for (const auto& name : request.names)
+            {
+                const auto invalid = validateName(name);
+                if (!invalid.isEmpty() || unique.contains(name))
+                    return {request, Error::InvalidName, invalid.isEmpty() ? QStringLiteral("Duplicate item name.") : invalid, {}, name};
+                unique.insert(name);
+            }
+            const auto directory = QDir(request.directory).canonicalPath();
+            if (directory.isEmpty())
+                return {request, Error::NotFound, QStringLiteral("The source directory is no longer available.")};
+            if (insideTrash(directory))
+                return {request, Error::Unsupported, QStringLiteral("Items already in the Trash must be managed through the desktop Trash.")};
+            const auto gio = QStandardPaths::findExecutable("gio");
+            if (gio.isEmpty())
+                return {request, Error::Unsupported, QStringLiteral("The gio command is required to use the desktop Trash.")};
+
+            for (const auto& name : request.names)
+            {
+                const auto path = QDir(directory).filePath(name);
+                QProcess process;
+                process.setStandardInputFile(QProcess::nullDevice());
+                process.start(gio, {"trash", "--", path});
+                if (!process.waitForStarted() || !process.waitForFinished(-1) ||
+                    process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
+                {
+                    result.error = Error::Io;
+                    result.failedName = name;
+                    result.message = QString::fromLocal8Bit(process.readAllStandardError()).trimmed();
+                    if (result.message.isEmpty())
+                        result.message = process.error() == QProcess::UnknownError ? QStringLiteral("The desktop Trash did not confirm the move.") : process.errorString();
+                    return result;
+                }
+                result.trashed.append(name);
+            }
+            return result;
+        }
     } // namespace
     QString validateName(const QString& name)
     {
@@ -71,11 +132,13 @@ namespace FileOperations
     }
     Result execute(const Request& request)
     {
+        if (!QDir::isAbsolutePath(request.directory) || request.directory.contains(QChar::Null))
+            return {request, Error::InvalidName, QStringLiteral("The parent directory must be an absolute path without NUL characters.")};
+        if (request.kind == Kind::Trash)
+            return trash(request);
         QString invalid = validateName(request.targetName);
         if (invalid.isEmpty() && request.kind == Kind::Rename)
             invalid = validateName(request.sourceName);
-        if (invalid.isEmpty() && (!QDir::isAbsolutePath(request.directory) || request.directory.contains(QChar::Null)))
-            invalid = QStringLiteral("The parent directory must be an absolute path without NUL characters.");
         if (!invalid.isEmpty())
             return {request, Error::InvalidName, invalid};
         const auto directory = QFile::encodeName(request.directory);

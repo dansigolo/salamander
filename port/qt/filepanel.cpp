@@ -382,6 +382,26 @@ QStringList FilePanel::operationNames() const
             names.append(index.data(QFileSystemModel::FileNameRole).toString());
     return names;
 }
+QString FilePanel::neighborName(const QStringList& excluded) const
+{
+    const QSet<QString> removed(excluded.begin(), excluded.end());
+    const auto root = view_->rootIndex();
+    const int row = view_->currentIndex().row();
+    const auto nameAt = [this, &root, &removed](int position) -> QString
+    {
+        const auto item = sorted_->index(position, 0, root);
+        const auto name = item.data(QFileSystemModel::FileNameRole).toString();
+        return item.flags().testFlag(Qt::ItemIsSelectable) && !removed.contains(name) ? name : QString();
+    };
+    for (int position = row + 1; position < sorted_->rowCount(root); ++position)
+        if (const auto name = nameAt(position); !name.isEmpty())
+            return name;
+    for (int position = row - 1; position >= 0; --position)
+        if (const auto name = nameAt(position); !name.isEmpty())
+            return name;
+    return {};
+}
+
 void FilePanel::focusEntry(const QString& name, bool mark)
 {
     pendingFocus_ = QDir(currentPath_).filePath(name);

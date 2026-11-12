@@ -1,6 +1,6 @@
 # Local operations: first milestone
 
-Implemented: F7 creates a single directory in the active panel; F2 renames marked entries, or the focused entry if there are no marks. Menus, toolbar and function-key controls share the same actions. F5 copying is described in COPYING.md. F6 moving is described in MOVING.md. Trash and permanent delete remain disabled.
+Implemented: F7 creates a single directory in the active panel; F2 renames marked entries, or the focused entry if there are no marks. Menus, toolbar and function-key controls share the same actions. F5 copying is described in COPYING.md. F6 moving is described in MOVING.md. F8 sends entries to the desktop Trash.
 
 ## Architecture
 
@@ -36,4 +36,12 @@ Hidden results remain subject to the hidden-file filter; the success message con
 
 Temporary fixtures cover Unicode/spaces, reserved/path-traversal names, files/folders, permission failures, live/dangling symlinks, same-name and missing-source cases, concurrent destination races and asynchronous job serialization. UI tests cover F7/F2, validation, cancellation, collisions, partial rename sessions, panel isolation, focus and function-key labels.
 
-Future copy/move/trash jobs need their own policies before implementation: overwrite decisions, progress/cancellation, partial output cleanup, metadata, symlink/hard-link handling, cross-filesystem behavior and failures. Do not infer those semantics from these atomic single-directory operations.
+## F8 — Desktop Trash
+
+F8 uses marked entries or the focused entry. The confirmation shows the source directory and the selected names, with Cancel as the default. The worker delegates each item to [GIO](https://docs.gtk.org/gio/method.File.trash.html) through `gio trash` (package `libglib2.0-bin` on Mint and Ubuntu). GIO chooses the trash location, gives duplicate names distinct entries and records the original path for desktop restoration. A symbolic link is sent as a link, including a dangling link. Entries in the desktop Trash should be managed from the desktop's Trash view.
+
+Cancel dismisses the confirmation. After confirmation, the batch runs in order on the worker and stops at the first error. Completed items remain in the Trash. The warning lists confirmed moves and the remaining items. Volumes where GIO declines trashing report a failure and leave the remaining items alone. F8 has no permanent deletion path.
+
+The source panels update through filesystem notifications. When the focused item was moved, the source panel prefers a neighboring entry outside the requested batch. Restore items from the desktop Trash.
+
+The automated integration test uses a temporary `XDG_DATA_HOME` on the same mount as the home directory to keep the test separate from the desktop's real Trash. Set `SALAMANDER_TRASH_TEST_ROOT` to a writable directory on that mount if necessary.

@@ -38,7 +38,7 @@ Install baseline packages on Mint/Ubuntu:
 
 ```sh
 sudo apt update
-sudo apt install build-essential cmake ninja-build pkg-config qt6-base-dev qt6-base-dev-tools qt6-wayland
+sudo apt install build-essential cmake ninja-build pkg-config qt6-base-dev qt6-base-dev-tools qt6-wayland libglib2.0-bin
 cmake -S . -B build/qt -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/qt
 ctest --test-dir build/qt --output-on-failure
@@ -71,7 +71,7 @@ Development branch: `improvement/salamander_for_linux`. Keep focused commits, ru
 
 ## Interface milestone
 
-The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F5 copy, F6 move and F7 mkdir are enabled; remaining file operations are disabled.
+The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F5 copy, F6 move, F7 mkdir and F8 Trash are enabled; remaining file operations are disabled.
 
 See [TESTING.md](TESTING.md) for compilation, disposable fixtures and a complete manual/automated test guide. Optional fixture launcher: `python3 tools/qt_smoke_fixture.py --launch`.
 

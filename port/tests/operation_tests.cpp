@@ -56,6 +56,20 @@ private slots:
         QVERIFY(execute({Kind::CreateDirectory, root.path(), {}, " leading and trailing "}).succeeded());
         QCOMPARE(execute({Kind::CreateDirectory, QDir::current().relativeFilePath(root.path()), {}, "folder"}).error, Error::InvalidName);
     }
+    void trashRejectsInvalidBatchBeforeMovingAnyEntry()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        QVERIFY(write(root.filePath("keep"), "original"));
+        for (const auto& invalid : {QString(".."), QString("outside/file"), QString("keep")})
+        {
+            const auto result = execute({Kind::Trash, root.path(), {}, {}, {"keep", invalid}});
+            QCOMPARE(result.error, Error::InvalidName);
+            QVERIFY(result.trashed.isEmpty());
+            QCOMPARE(read(root.filePath("keep")), QByteArray("original"));
+        }
+    }
+
     void renameFilesFoldersAndNoOverwrite()
     {
         QTemporaryDir root;

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include <QString>
+#include <QStringList>
 #include <QMetaType>
 namespace FileOperations
 {
     enum class Kind
     {
         CreateDirectory,
-        Rename
+        Rename,
+        Trash
     };
     enum class Error
     {
@@ -25,12 +27,15 @@ namespace FileOperations
         QString directory;
         QString sourceName;
         QString targetName;
+        QStringList names; // Trash batch, in operation order.
     };
     struct Result
     {
         Request request;
         Error error = Error::None;
         QString message;
+        QStringList trashed;
+        QString failedName;
         bool succeeded() const { return error == Error::None; }
     };
     // Names are single Linux path components; whitespace is significant.

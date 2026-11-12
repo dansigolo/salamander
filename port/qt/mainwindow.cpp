@@ -123,11 +123,11 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     }
     top->addSeparator();
     const QString operationNames[] = {"renameFiles", "viewFile", "editFile", "copyFiles", "moveFiles", "makeDirectory", "deleteFiles"};
-    const QString operationTexts[] = {tr("Rename"), tr("View"), tr("Edit"), tr("Copy"), tr("Move"), tr("Make directory"), tr("Delete")};
+    const QString operationTexts[] = {tr("Rename"), tr("View"), tr("Edit"), tr("Copy"), tr("Move"), tr("Make directory"), tr("Move to Trash")};
     QList<QAction*> operations;
     for (int i = 0; i < 7; ++i)
     {
-        auto* action = (i == 0 || i == 3 || i == 4 || i == 5) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
+        auto* action = (i == 0 || i == 3 || i == 4 || i == 5 || i == 6) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
         action->setObjectName(operationNames[i]);
         filesMenu->addAction(action);
         operations.append(action);
@@ -142,6 +142,9 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
             { copyItems(true); });
     renameAction_ = operations[0];
     createDirectoryAction_ = operations[5];
+    trashAction_ = operations[6];
+    trashAction_->setShortcut(QKeySequence(Qt::Key_F8));
+    connect(trashAction_, &QAction::triggered, this, &MainWindow::trashItems);
     renameAction_->setShortcut(QKeySequence(Qt::Key_F2));
     createDirectoryAction_->setShortcut(QKeySequence(Qt::Key_F7));
     connect(renameAction_, &QAction::triggered, this, &MainWindow::renameItems);
@@ -280,7 +283,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     help->setObjectName("showHelp");
     help->setShortcut(QKeySequence(Qt::Key_F1));
     connect(help, &QAction::triggered, this, [this]
-            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF5: copy to the other panel\nF6: move to the other panel\nF7: create directory\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
+            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF5: copy to the other panel\nF6: move to the other panel\nF7: create directory\nF8: move to Trash\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
     helpMenu->addAction(help);
     auto* about = helpMenu->addAction(tr("About"));
     connect(about, &QAction::triggered, this, [this]
@@ -302,7 +305,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     keys.append(menu);
     keys.append(unavailable(tr("Connect"), "connectNetwork"));
     keys.append(unavailable(tr("Disconnect"), "disconnectNetwork"));
-    const QString labels[] = {tr("Help"), tr("Rename"), tr("View"), tr("Edit"), tr("Copy"), tr("Move"), tr("MakeDir"), tr("Delete"), tr("UsrMenu"), tr("Menu"), tr("Connect"), tr("Disconnect")};
+    const QString labels[] = {tr("Help"), tr("Rename"), tr("View"), tr("Edit"), tr("Copy"), tr("Move"), tr("MakeDir"), tr("Trash"), tr("UsrMenu"), tr("Menu"), tr("Connect"), tr("Disconnect")};
     for (int i = 0; i < keys.size(); ++i)
     {
         auto* button = new QToolButton(functionBar);
@@ -439,10 +442,91 @@ void MainWindow::updateOperationActions()
         return;
     const bool available = !controller_->isBusy() && !copySession_ && !copyController_->isBusy() && !dialogOpen_ && !renameSession_;
     createDirectoryAction_->setEnabled(available);
-    renameAction_->setEnabled(available && !active_->operationNames().isEmpty());
-    copyAction_->setEnabled(available && !active_->operationNames().isEmpty());
-    moveAction_->setEnabled(available && !active_->operationNames().isEmpty());
+    const bool hasItems = available && !active_->operationNames().isEmpty();
+    renameAction_->setEnabled(hasItems);
+    copyAction_->setEnabled(hasItems);
+    moveAction_->setEnabled(hasItems);
+    trashAction_->setEnabled(hasItems);
 }
+void MainWindow::trashItems()
+{
+    if (!trashAction_->isEnabled())
+        return;
+    const auto names = active_->operationNames();
+    if (names.isEmpty())
+        return;
+
+    operationPanel_ = active_;
+    const auto directory = active_->currentPath();
+    trashFocusedName_ = active_->view()->currentIndex().data(QFileSystemModel::FileNameRole).toString();
+    trashNeighbor_ = names.contains(trashFocusedName_) ? active_->neighborName(names) : QString();
+    auto* dialog = new QMessageBox(QMessageBox::Question, tr("Move to Trash"), QString(), QMessageBox::Cancel, this);
+    dialog->setObjectName("trashConfirmation");
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowModality(Qt::WindowModal);
+    dialog->setTextFormat(Qt::PlainText);
+    auto preview = names.mid(0, 8).join("\n");
+    if (names.size() > 8)
+        preview += tr("\n…and %n more", nullptr, names.size() - 8);
+    dialog->setText(tr("Move %n item(s) to the Trash?", nullptr, names.size()) + "\n\n" + directory + "\n\n" + preview);
+    if (names.size() > 8)
+        dialog->setDetailedText(names.join("\n"));
+    auto* confirm = dialog->addButton(tr("Move to Trash"), QMessageBox::AcceptRole);
+    confirm->setObjectName("confirmTrash");
+    dialog->setDefaultButton(QMessageBox::Cancel);
+    dialog->setEscapeButton(QMessageBox::Cancel);
+    dialogOpen_ = true;
+    updateOperationActions();
+    connect(dialog, &QMessageBox::finished, this, [this, dialog, confirm, directory, names]
+            {
+        dialogOpen_ = false;
+        if (dialog->clickedButton() == confirm)
+        {
+            operationStatus_->setText(tr("Moving items to the Trash…"));
+            controller_->start({FileOperations::Kind::Trash, directory, {}, {}, names});
+        }
+        updateOperationActions(); });
+    dialog->open();
+}
+
+void MainWindow::finishTrash(const FileOperations::Result& result)
+{
+    for (auto* panel : {left_, right_})
+        if (panel->currentPath() == result.request.directory)
+            panel->refreshStorageInfo();
+    if (result.trashed.contains(trashFocusedName_) && !trashNeighbor_.isEmpty() &&
+        operationPanel_->currentPath() == result.request.directory)
+    {
+        const auto neighbor = QDir(result.request.directory).filePath(trashNeighbor_);
+        if (operationPanel_->visibleIndex(neighbor).isValid())
+            operationPanel_->focusEntry(trashNeighbor_);
+    }
+    const auto summary = tr("Moved %n item(s) to the Trash.", nullptr, result.trashed.size());
+    operationStatus_->setText(summary);
+    operationStatus_->show();
+    const int generation = ++statusGeneration_;
+    QTimer::singleShot(5000, this, [this, generation]
+                       {
+        if (generation == statusGeneration_ && !controller_->isBusy() && !copySession_ && !dialogOpen_)
+            operationStatus_->hide(); });
+    if (!result.succeeded())
+    {
+        auto* message = new QMessageBox(QMessageBox::Warning, tr("Could not finish moving to Trash"), summary, QMessageBox::Ok, this);
+        message->setObjectName("trashError");
+        message->setAttribute(Qt::WA_DeleteOnClose);
+        message->setWindowModality(Qt::WindowModal);
+        message->setTextFormat(Qt::PlainText);
+        QStringList pending = result.request.names;
+        for (const auto& name : result.trashed)
+            pending.removeOne(name);
+        const auto failure = result.failedName.isEmpty() ? result.message : tr("Could not move: %1\n%2").arg(result.failedName, result.message);
+        message->setText(summary + "\n\n" + failure);
+        message->setDetailedText(tr("Source directory: %1\n\nMoved to Trash:\n%2\n\nNot confirmed as moved:\n%3").arg(result.request.directory, result.trashed.join("\n"), pending.join("\n")));
+        message->open();
+    }
+    updateOperationActions();
+}
+
 void MainWindow::createDirectory()
 {
     if (controller_->isBusy() || copySession_ || dialogOpen_ || renameSession_)
@@ -506,6 +590,11 @@ void MainWindow::showRenameDialog()
 }
 void MainWindow::finishOperation(const FileOperations::Result& result)
 {
+    if (result.request.kind == FileOperations::Kind::Trash)
+    {
+        finishTrash(result);
+        return;
+    }
     if (!result.succeeded())
     {
         showOperationError(result);

@@ -29,6 +29,10 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QSettings>
+#include <QScopeGuard>
+#include <sys/stat.h>
+#include <QUrl>
+#include <algorithm>
 #include <QToolBar>
 #include <QToolButton>
 class ViewportPaintRegion : public QObject
@@ -117,7 +121,7 @@ private slots:
             QCOMPARE(window.menuBar()->actions()[i]->text(), names[i]);
         for (const auto* name : {"topToolbar", "placesToolbar", "functionToolbar"})
             QVERIFY(window.findChild<QToolBar*>(name));
-        for (const auto* name : {"deleteFiles", "userMenu", "connectNetwork", "disconnectNetwork"})
+        for (const auto* name : {"userMenu", "connectNetwork", "disconnectNetwork"})
         {
             auto* action = window.findChild<QAction*>(name);
             QVERIFY(action);
@@ -492,6 +496,133 @@ private slots:
         QVERIFY(!root.exists("a.txt"));
         QVERIFY(!root.exists("b.txt"));
         QTRY_COMPARE(panel->selectedPaths().size(), 4);
+    }
+
+    void f8ConfirmsAndTrashesMarkedItemsWithRestoreMetadata()
+    {
+        const QDir testRoot(qEnvironmentVariable("SALAMANDER_TRASH_TEST_ROOT", QDir::homePath()));
+        QTemporaryDir temporary(testRoot.filePath("salamander-trash-test-XXXXXX"));
+        QVERIFY(temporary.isValid());
+        // GIO uses the home Trash for entries on the home device.
+        struct stat testDevice
+        {
+        }, homeDevice{};
+        QCOMPARE(::stat(QFile::encodeName(temporary.path()).constData(), &testDevice), 0);
+        QCOMPARE(::stat(QFile::encodeName(QDir::homePath()).constData(), &homeDevice), 0);
+        QCOMPARE(testDevice.st_dev, homeDevice.st_dev);
+        QDir root(temporary.path());
+        QVERIFY(root.mkpath("source/folder-a"));
+        QVERIFY(root.mkdir("data"));
+        const QByteArray previousData = qgetenv("XDG_DATA_HOME");
+        QVERIFY(qputenv("XDG_DATA_HOME", QFile::encodeName(root.filePath("data"))));
+        const auto restoreEnvironment = qScopeGuard([&]
+                                                    {
+            if (previousData.isNull())
+                qunsetenv("XDG_DATA_HOME");
+            else
+                qputenv("XDG_DATA_HOME", previousData); });
+        const QDir source(root.filePath("source"));
+        const QString filename = QString::fromUtf8("a % cão.txt");
+        const auto write = [&](const QString& name)
+        {
+            QFile file(source.filePath(name));
+            return file.open(QIODevice::WriteOnly) && file.write("test") == 4;
+        };
+        QVERIFY(write(filename));
+        QVERIFY(write("folder-a/child"));
+        QVERIFY(write("keep.txt"));
+        QVERIFY(QFile::link(source.filePath("missing"), source.filePath("broken-link")));
+        const QDir trash(root.filePath("data/Trash"));
+
+        QSettings settings(root.filePath("settings.ini"), QSettings::IniFormat);
+        MainWindow window(source.path(), source.path(), false, &settings);
+        window.show();
+        window.activateWindow();
+        auto* panel = window.leftPanel();
+        auto* view = panel->view();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        for (const auto& name : {filename, QString("folder-a"), QString("broken-link"), QString("keep.txt")})
+            QTRY_VERIFY(panel->visibleIndex(source.filePath(name)).isValid());
+
+        view->selectionModel()->setCurrentIndex(panel->visibleIndex(source.filePath(filename)), QItemSelectionModel::NoUpdate);
+        QTest::keyClick(view, Qt::Key_F8);
+        auto* confirmation = window.findChild<QMessageBox*>("trashConfirmation");
+        QVERIFY(confirmation);
+        QVERIFY(confirmation->text().contains(filename));
+        QCOMPARE(confirmation->defaultButton(), confirmation->button(QMessageBox::Cancel));
+        QTest::keyClick(confirmation, Qt::Key_Escape);
+        QTRY_VERIFY(!window.findChild<QMessageBox*>("trashConfirmation"));
+        QVERIFY(source.exists(filename));
+        QVERIFY(!trash.exists());
+
+        const QStringList marked{"folder-a", filename, "broken-link"};
+        for (const auto& name : marked)
+            view->selectionModel()->select(panel->visibleIndex(source.filePath(name)), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        view->selectionModel()->setCurrentIndex(panel->visibleIndex(source.filePath("folder-a")), QItemSelectionModel::NoUpdate);
+        window.activateWindow();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        QTest::keyClick(view, Qt::Key_F8);
+        confirmation = window.findChild<QMessageBox*>("trashConfirmation");
+        QVERIFY(confirmation);
+        for (const auto& name : marked)
+            QVERIFY(confirmation->text().contains(name));
+        confirmation->findChild<QPushButton*>("confirmTrash")->click();
+        QTRY_VERIFY(trash.exists("files/folder-a/child"));
+        QTRY_VERIFY(trash.exists("files/" + filename));
+        QTRY_VERIFY(QFileInfo(trash.filePath("files/broken-link")).isSymbolicLink());
+        QTRY_VERIFY(panel->selectedPaths().isEmpty());
+        QTRY_COMPARE(view->currentIndex().data(QFileSystemModel::FileNameRole).toString(), QString("keep.txt"));
+        QVERIFY(source.exists("keep.txt"));
+        QVERIFY(!source.exists(filename));
+        QVERIFY(!QFileInfo(source.filePath("broken-link")).isSymbolicLink());
+
+        QFile info(trash.filePath("info/" + filename + ".trashinfo"));
+        QVERIFY(info.open(QIODevice::ReadOnly));
+        const auto fields = info.readAll().split('\n');
+        QVERIFY(fields.contains("[Trash Info]"));
+        const auto path = std::find_if(fields.begin(), fields.end(), [](const QByteArray& field)
+                                       { return field.startsWith("Path="); });
+        QVERIFY(path != fields.end());
+        const auto original = QUrl::fromPercentEncoding(path->mid(5));
+        QCOMPARE(original, source.filePath(filename));
+        QVERIFY(QFile::rename(trash.filePath("files/" + filename), original));
+        QFile restored(original);
+        QVERIFY(restored.open(QIODevice::ReadOnly));
+        QCOMPARE(restored.readAll(), QByteArray("test"));
+
+        QVERIFY(write("another.txt"));
+        QVERIFY(write("will-fail.txt"));
+        QVERIFY(write("will-stay.txt"));
+        for (const QString name : {"another.txt", "will-fail.txt", "will-stay.txt"})
+            QTRY_VERIFY(panel->visibleIndex(source.filePath(name)).isValid());
+        for (const QString name : {"another.txt", "will-fail.txt", "will-stay.txt"})
+            view->selectionModel()->select(panel->visibleIndex(source.filePath(name)), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        window.activateWindow();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        QTest::keyClick(view, Qt::Key_F8);
+        confirmation = window.findChild<QMessageBox*>("trashConfirmation");
+        QVERIFY(confirmation);
+        QVERIFY(QFile::remove(source.filePath("will-fail.txt")));
+        confirmation->findChild<QPushButton*>("confirmTrash")->click();
+        QTRY_VERIFY(window.findChild<QMessageBox*>("trashError"));
+        const auto* error = window.findChild<QMessageBox*>("trashError");
+        QVERIFY(error->text().contains("will-fail.txt"));
+        QVERIFY(error->detailedText().contains("will-stay.txt"));
+        QVERIFY(trash.exists("files/another.txt"));
+        QVERIFY(source.exists("will-stay.txt"));
+        QVERIFY(!trash.exists("files/will-stay.txt"));
+
+        QVERIFY(write("another.txt"));
+        const auto duplicate = FileOperations::execute({FileOperations::Kind::Trash, source.path(), {}, {}, {"another.txt"}});
+        QVERIFY2(duplicate.succeeded(), qPrintable(duplicate.message));
+        const auto entries = QDir(trash.filePath("files")).entryList({"another*"}, QDir::Files);
+        QCOMPARE(entries.size(), 2);
+        const auto alreadyTrashed = FileOperations::execute({FileOperations::Kind::Trash, trash.filePath("files"), {}, {}, {entries.first()}});
+        QCOMPARE(alreadyTrashed.error, FileOperations::Error::Unsupported);
+        QCOMPARE(QDir(trash.filePath("files")).entryList({"another*"}, QDir::Files), entries);
     }
 
     void f5CopiesMarkedItemsToTheOtherPanelWithoutDeletingSources()

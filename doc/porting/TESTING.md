@@ -87,7 +87,7 @@ A barra mostra bytes planejados processados, incluindo itens pulados; o resumo f
 
 ## Limitações esperadas nesta etapa
 
-F2 (renomear), F5 (copiar), F6 (mover) e F7 (criar pasta) estão ativos. F3–F4, F8–F9 e F11–F12 permanecem desabilitados: visualizar/editar, excluir, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
+F2 (renomear), F5 (copiar), F6 (mover), F7 (criar pasta) e F8 (lixeira) estão ativos. F3–F4, F9 e F11–F12 permanecem desabilitados: visualizar/editar, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
 
 ## Testes automatizados
 
@@ -135,3 +135,17 @@ A suíte `file_move` usa dois sistemas de arquivos reais. Por padrão o destino 
 3. Crie um tema com **New…**, exporte o JSON e reimporte com **Import…**. Salve e confira se o tema aparece ao reabrir.
 4. Com **Full Row Select** desligado, clique no nome e depois no tamanho de outro item. O foco deve ficar no primeiro item. Marque um arquivo com Insert e verifique o destaque na área do nome.
 5. Ligue **Full Row Select**. Clique no tamanho de outro item e confira o foco na linha inteira. As marcas anteriores devem permanecer ao alternar o modo.
+
+
+## Lixeira — F8
+
+Execute a fixture em uma pasta temporária no mesmo volume do seu diretório pessoal.
+
+```bash
+TMPDIR="$HOME" python3 tools/qt_smoke_fixture.py --launch
+```
+
+1. Marque `alpha.txt` e `folder-a`, pressione **F8** e confira os nomes. Pressione **Esc** e verifique que os itens continuam na origem.
+2. Repita e clique em **Move to Trash**. Confira que o painel removeu os dois itens da lista e que o foco passou para um vizinho, caso o item em foco tenha sido enviado.
+3. Abra a **Lixeira** do Mint e restaure os dois itens da fixture. Confira os arquivos na origem e o conteúdo da pasta restaurada.
+4. Sem marcas, use F8 no item em foco. Para testar um lote parcial, deixe a confirmação aberta e renomeie um dos itens por outro aplicativo. O aviso deve indicar os itens já enviados e os que não foram confirmados.

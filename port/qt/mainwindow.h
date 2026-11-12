@@ -34,6 +34,8 @@ private:
     void finishCopy(const CopyOperations::Result& result);
     void showCopyConflict(const CopyOperations::Conflict& conflict, quint64 token);
     void createDirectory();
+    void trashItems();
+    void finishTrash(const FileOperations::Result& result);
     void renameItems();
     void showRenameDialog();
     void finishOperation(const FileOperations::Result& result);
@@ -65,6 +67,9 @@ private:
     bool copySession_ = false;
     QAction* renameAction_;
     QAction* createDirectoryAction_;
+    QAction* trashAction_;
+    QString trashFocusedName_;
+    QString trashNeighbor_;
     QLabel* operationStatus_;
     FilePanel* operationPanel_ = nullptr;
     QString operationDirectory_;
