@@ -318,9 +318,33 @@ void FileView::keyReleaseEvent(QKeyEvent* event)
     QTreeView::keyReleaseEvent(event);
 }
 
+void FileView::updateFocusRow(const QModelIndex& index)
+{
+    if (!fullRowSelect_ || !index.isValid())
+        return;
+    const auto cell = visualRect(index);
+    if (cell.isValid())
+        viewport()->update(0, cell.y(), viewport()->width(), cell.height());
+}
+
+void FileView::currentChanged(const QModelIndex& current, const QModelIndex& previous)
+{
+    QTreeView::currentChanged(current, previous);
+    // Qt can invalidate just the current cell. Our focus outline spans every column.
+    updateFocusRow(previous);
+    updateFocusRow(current);
+}
+
+void FileView::focusInEvent(QFocusEvent* event)
+{
+    QTreeView::focusInEvent(event);
+    updateFocusRow(currentIndex());
+}
+
 void FileView::focusOutEvent(QFocusEvent* event)
 {
     shiftSelecting_ = false;
     clearSearch();
     QTreeView::focusOutEvent(event);
+    updateFocusRow(currentIndex());
 }

@@ -25,12 +25,15 @@ protected:
     bool focusNextPrevChild(bool next) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
+    void focusInEvent(QFocusEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
+    void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
     QItemSelectionModel::SelectionFlags selectionCommand(const QModelIndex& index, const QEvent* event) const override;
     void keyboardSearch(const QString&) override {} // All type-to-search goes through the prefix state below.
 private:
     QRect nameArea(const QModelIndex& index, const QRect& cell, QStyleOptionViewItem option) const;
     bool acceptsClick(const QMouseEvent* event) const;
+    void updateFocusRow(const QModelIndex& index);
     void focusRow(int row);
     void toggleAndAdvance();
     bool findPrefix(const QString& prefix, int start, int direction);

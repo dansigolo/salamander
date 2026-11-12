@@ -15,6 +15,8 @@
 #include <QPushButton>
 #include <QMessageBox>
 #include <QPointer>
+#include <QPaintEvent>
+#include <QStandardItemModel>
 #include <QAction>
 #include <QComboBox>
 #include <QDir>
@@ -29,6 +31,20 @@
 #include <QSettings>
 #include <QToolBar>
 #include <QToolButton>
+class ViewportPaintRegion : public QObject
+{
+public:
+    QRegion painted;
+
+protected:
+    bool eventFilter(QObject* object, QEvent* event) override
+    {
+        if (event->type() == QEvent::Paint)
+            painted += static_cast<QPaintEvent*>(event)->region();
+        return QObject::eventFilter(object, event);
+    }
+};
+
 class WindowTests : public QObject
 {
     Q_OBJECT
@@ -156,6 +172,41 @@ private slots:
         MainWindow reopened(temporary.path(), temporary.path(), false, &settings);
         QVERIFY(reopened.leftPanel()->view()->fullRowSelect());
         QVERIFY(reopened.rightPanel()->view()->fullRowSelect());
+    }
+
+    void fullRowFocusRepaintsPreviousAndCurrentRows()
+    {
+        QStandardItemModel model(2, 3);
+        model.setData(model.index(0, 0), QString("first"));
+        model.setData(model.index(1, 0), QString("second"));
+        FileView view;
+        view.setModel(&model);
+        view.setRootIsDecorated(false);
+        view.setSelectionBehavior(QAbstractItemView::SelectRows);
+        view.setFullRowSelect(true);
+        view.resize(400, 200);
+        view.show();
+        view.activateWindow();
+        view.setFocus();
+        QTRY_VERIFY(view.hasFocus());
+
+        const auto first = model.index(0, 0);
+        const auto second = model.index(1, 0);
+        view.selectionModel()->setCurrentIndex(model.index(0, 2), QItemSelectionModel::NoUpdate);
+        QCoreApplication::processEvents();
+
+        ViewportPaintRegion updates;
+        view.viewport()->installEventFilter(&updates);
+        const auto secondName = view.visualRect(second);
+        QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, secondName.center());
+        QCOMPARE(view.currentIndex(), second);
+        const auto fullRow = [&view](const QModelIndex& item)
+        {
+            const auto cell = view.visualRect(item);
+            return QRect(0, cell.top(), view.viewport()->width(), cell.height());
+        };
+        const auto expected = QRegion(fullRow(first)) + QRegion(fullRow(second));
+        QTRY_VERIFY_WITH_TIMEOUT(expected.subtracted(updates.painted).isEmpty(), 1000);
     }
 
     void appearancePreviewCancelAndSave()
