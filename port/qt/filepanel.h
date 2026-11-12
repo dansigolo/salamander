@@ -65,7 +65,7 @@ private:
     FileView* view_;
     QComboBox* path_;
     QLabel* space_;
-    QWidget* pathBar_;
+    QWidget* activeIndicator_;
     QAction* back_;
     QAction* forward_;
     QStringList history_;

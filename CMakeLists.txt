@@ -17,7 +17,7 @@ add_library(salamander_operations port/operations/fileoperations_linux.cpp port/
 set_target_properties(salamander_operations PROPERTIES AUTOMOC ON)
 target_include_directories(salamander_operations PUBLIC port/operations)
 target_link_libraries(salamander_operations PUBLIC Qt6::Core Qt6::Concurrent)
-add_library(salamander_ui port/qt/filepanel.cpp port/qt/fileview.cpp port/qt/detailedfilemodel.cpp port/qt/mainwindow.cpp port/qt/namedialog.cpp port/qt/copydialogs.cpp)
+add_library(salamander_ui port/qt/filepanel.cpp port/qt/fileview.cpp port/qt/detailedfilemodel.cpp port/qt/mainwindow.cpp port/qt/namedialog.cpp port/qt/copydialogs.cpp port/qt/appearance.cpp)
 set_target_properties(salamander_ui PROPERTIES AUTOMOC ON)
 target_include_directories(salamander_ui PUBLIC port/qt)
 target_link_libraries(salamander_ui PUBLIC Qt6::Widgets Qt6::Concurrent salamander_operations)

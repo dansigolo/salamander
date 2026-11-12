@@ -126,3 +126,12 @@ Use somente a fixture descartável (`python3 tools/qt_smoke_fixture.py --launch`
 6. Leia os avisos de erro: eles distinguem origem mantida, origem parcial e caminho privado de recuperação. Não apague caminhos de recuperação antes de inspecioná-los. Restrições de ACL/xattrs, hardlinks e metadados estão em `MOVING.md`.
 
 A suíte `file_move` usa dois sistemas de arquivos reais. Por padrão o destino é `/dev/shm/salamander-move-tests`; se necessário, rode `SALAMANDER_MOVE_TEST_DESTINATION=/pasta/em/outro/filesystem ctest --test-dir build/qt --output-on-failure`. A suíte falha quando não consegue exercitar EXDEV; não ignora silenciosamente esse cenário.
+
+
+## Aparência e seleção
+
+1. No Mint, compare o tema escuro do sistema com **Options → Appearance… → System**. Troque de painel com Tab e confira o indicador, o caminho, os ícones e o espaço livre. Repita com **Light**, **Dark** e **Dracula**.
+2. Troque a cor de destaque, cancele e confira se as cores anteriores voltam. Salve uma nova aparência e reabra o aplicativo.
+3. Crie um tema com **New…**, exporte o JSON e reimporte com **Import…**. Salve e confira se o tema aparece ao reabrir.
+4. Com **Full Row Select** desligado, clique no nome e depois no tamanho de outro item. O foco deve ficar no primeiro item. Marque um arquivo com Insert e verifique o destaque na área do nome.
+5. Ligue **Full Row Select**. Clique no tamanho de outro item e confira o foco na linha inteira. As marcas anteriores devem permanecer ao alternar o modo.

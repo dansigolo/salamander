@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mainwindow.h"
+#include "appearance.h"
 #include "filepanel.h"
 #include "fileview.h"
 #include "detailedfilemodel.h"
@@ -8,6 +9,9 @@
 #include "copycontroller.h"
 #include "copydialogs.h"
 #include <QDialogButtonBox>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QTimer>
 #include <QPushButton>
 #include <QMessageBox>
 #include <QPointer>
@@ -104,6 +108,142 @@ private slots:
             QVERIFY(!action->isEnabled());
         }
     }
+    void fullRowSelectChangesMouseTargetAndPreservesMarks()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QVERIFY(QDir(temporary.path()).mkdir("folder"));
+        QFile file(temporary.filePath("test.txt"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+        QSettings settings(temporary.filePath("preferences.ini"), QSettings::IniFormat);
+        {
+            MainWindow window(temporary.path(), temporary.path(), false, &settings);
+            window.show();
+            window.activateWindow();
+            auto* panel = window.leftPanel();
+            auto* view = panel->view();
+            const auto filePath = file.fileName();
+            const auto folderPath = temporary.filePath("folder");
+            QTRY_VERIFY(panel->visibleIndex(filePath).isValid());
+            QTRY_VERIFY(panel->visibleIndex(folderPath).isValid());
+            auto* option = window.findChild<QAction*>("fullRowSelect");
+            QVERIFY(option && !option->isChecked());
+            const auto item = panel->visibleIndex(filePath);
+            const auto folder = panel->visibleIndex(folderPath);
+            const QPoint folderSize = view->visualRect(folder.siblingAtColumn(DetailedFileModel::Size)).center();
+            view->selectionModel()->setCurrentIndex(item, QItemSelectionModel::NoUpdate);
+            view->selectionModel()->select(item, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+            QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::ControlModifier, folderSize);
+            QTest::mouseDClick(view->viewport(), Qt::LeftButton, Qt::NoModifier, folderSize);
+            QCOMPARE(panel->currentPath(), temporary.path());
+            QCOMPARE(view->currentIndex(), item);
+            QCOMPARE(panel->selectedPaths(), QStringList{filePath});
+            const QPoint folderName = view->visualRect(folder).topLeft() + QPoint(10, view->visualRect(folder).height() / 2);
+            QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::NoModifier, folderName);
+            QCOMPARE(view->currentIndex(), folder);
+            option->trigger();
+            QVERIFY(window.rightPanel()->view()->fullRowSelect());
+            QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::ControlModifier, folderSize);
+            QCOMPARE(view->currentIndex().siblingAtColumn(0), folder);
+            QVERIFY(panel->selectedPaths().contains(folderPath));
+            QCOMPARE(panel->selectedPaths().size(), 2);
+            option->trigger();
+            QCOMPARE(view->currentIndex(), folder);
+            QCOMPARE(panel->selectedPaths().size(), 2);
+            option->trigger();
+        }
+        MainWindow reopened(temporary.path(), temporary.path(), false, &settings);
+        QVERIFY(reopened.leftPanel()->view()->fullRowSelect());
+        QVERIFY(reopened.rightPanel()->view()->fullRowSelect());
+    }
+
+    void appearancePreviewCancelAndSave()
+    {
+        QTemporaryDir temporary;
+        QSettings settings(temporary.filePath("preferences.ini"), QSettings::IniFormat);
+        Appearance::apply(settings);
+        const auto system = QApplication::palette();
+        MainWindow window(temporary.path(), temporary.path(), false, &settings);
+        window.show();
+        auto* action = window.findChild<QAction*>("appearance");
+        QVERIFY(action);
+        const auto choose = [&](bool save)
+        {
+            auto* dialog = window.findChild<QDialog*>("appearanceDialog");
+            QVERIFY(dialog);
+            auto* combo = dialog->findChild<QComboBox*>("themeChoice");
+            combo->setCurrentIndex(combo->findData("dracula"));
+            const auto previewBase = QApplication::palette().color(QPalette::Base);
+            const auto previewText = window.leftPanel()->view()->palette().color(QPalette::Text);
+            dialog->done(save ? QDialog::Accepted : QDialog::Rejected);
+            QCOMPARE(previewBase, QColor("#21222c"));
+            QCOMPARE(previewText, QColor("#f8f8f2"));
+        };
+        QTimer::singleShot(0, &window, [&]
+                           { choose(false); });
+        action->trigger();
+        QCOMPARE(QApplication::palette(), system);
+        QVERIFY(!settings.contains("appearance/theme"));
+        QTimer::singleShot(0, &window, [&]
+                           { choose(true); });
+        action->trigger();
+        QCOMPARE(settings.value("appearance/theme").toString(), QString("dracula"));
+        settings.sync();
+        QSettings reopened(settings.fileName(), QSettings::IniFormat);
+        QApplication::setPalette(QPalette());
+        Appearance::apply(reopened);
+        QCOMPARE(QApplication::palette().color(QPalette::Link), QColor("#bd93f9"));
+        settings.setValue("appearance/theme", "system");
+        Appearance::apply(settings);
+        QCOMPARE(QApplication::palette(), system);
+    }
+
+    void exportedThemeCanBeImportedAndReopened()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        const auto path = temporary.filePath("shared.json");
+        QSettings settings(temporary.filePath("preferences.ini"), QSettings::IniFormat);
+        MainWindow window(temporary.path(), temporary.path(), false, &settings);
+        auto* action = window.findChild<QAction*>("appearance");
+        QVERIFY(action);
+        QTimer::singleShot(0, &window, [&]
+                           {
+            auto* dialog = window.findChild<QDialog*>("appearanceDialog");
+            QVERIFY(dialog);
+            auto* combo = dialog->findChild<QComboBox*>("themeChoice");
+            combo->setCurrentIndex(combo->findData("dracula"));
+            const auto pickFile = [&] {
+                auto* chooser = dialog->findChild<QFileDialog*>();
+                QVERIFY(chooser);
+                QTimer::singleShot(500, chooser, &QDialog::reject);
+                chooser->selectFile(path);
+                QMetaObject::invokeMethod(chooser, "accept", Qt::DirectConnection);
+            };
+            const auto saveAndOpen = [&](const char* button) {
+                QTimer::singleShot(0, dialog, pickFile);
+                dialog->findChild<QPushButton*>(button)->click();
+            };
+            saveAndOpen("exportTheme");
+            const bool exported = QFileInfo(path).isFile();
+            if (exported)
+                saveAndOpen("importTheme");
+            const auto selectedName = combo->currentText();
+            const auto selectedId = combo->currentData().toString();
+            dialog->accept();
+            QVERIFY(exported);
+            QCOMPARE(selectedName, QString("Dracula"));
+            QVERIFY(selectedId != "dracula"); });
+        action->trigger();
+        settings.sync();
+        QSettings reopened(settings.fileName(), QSettings::IniFormat);
+        Appearance::apply(reopened);
+        const auto loaded = QApplication::palette().color(QPalette::Link);
+        QApplication::setPalette(QPalette());
+        QCOMPARE(loaded, QColor("#bd93f9"));
+    }
+
     void selectionPreferenceAppliesToBothPanelsAndPersists()
     {
         QTemporaryDir temporary;
@@ -547,13 +687,32 @@ private slots:
             QVERIFY(file.open(QIODevice::WriteOnly));
             file.write("Salamander Linux interface fixture\n");
         }
-        MainWindow window(root.path(), root.filePath("projects"));
+        QTemporaryDir config;
+        QVERIFY(config.isValid());
+        QSettings preferences(config.filePath("preferences.ini"), QSettings::IniFormat);
+        preferences.setValue("appearance/theme", qEnvironmentVariable("SALAMANDER_TEST_THEME", "system"));
+        preferences.setValue("panels/fullRowSelect", qEnvironmentVariableIsSet("SALAMANDER_TEST_FULL_ROW"));
+        Appearance::apply(preferences);
+        MainWindow window(root.path(), root.filePath("projects"), true, &preferences);
         window.show();
         QTRY_VERIFY(window.leftPanel()->view()->model()->rowCount(window.leftPanel()->view()->rootIndex()) >= 6);
         const auto marked = window.leftPanel()->visibleIndex(root.filePath("notes.txt"));
         window.leftPanel()->view()->selectionModel()->select(marked, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        window.leftPanel()->view()->selectionModel()->setCurrentIndex(window.leftPanel()->visibleIndex(root.filePath("archive.tar.gz")), QItemSelectionModel::NoUpdate);
         QTest::qWait(150);
         QVERIFY(window.grab().save(path));
+        const auto appearancePath = qEnvironmentVariable("SALAMANDER_TEST_APPEARANCE_SCREENSHOT");
+        if (!appearancePath.isEmpty())
+        {
+            bool saved = false;
+            QTimer::singleShot(50, &window, [&]
+                               {
+                auto* appearance = window.findChild<QDialog*>("appearanceDialog");
+                saved = appearance->grab().save(appearancePath);
+                appearance->reject(); });
+            window.findChild<QAction*>("appearance")->trigger();
+            QVERIFY(saved);
+        }
         const auto copyPath = qEnvironmentVariable("SALAMANDER_COPY_SCREENSHOT");
         if (!copyPath.isEmpty())
         {

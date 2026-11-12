@@ -15,7 +15,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Middle toolbar | Pending | Inventory actions and placement |
 | Drive/mount toolbar | Partial | Mounted Linux volumes and free space loaded asynchronously; mounting/unmounting pending |
 | User menu and favorite-directory bars | Partial | Standard places and session favorites work; persisted customization and user-command menu pending |
-| Panel toolbars and path bars | Partial | Back/forward/up, editable history dropdown, active-panel header and free space implemented; original customizations remain |
+| Panel toolbars and path bars | Partial | Back/forward/up, editable history dropdown, theme-aware active-panel indicator and free space implemented; original customizations remain |
 | Detailed columns: Name, Ext, Size, Date, Time, Attr | Partial | Six columns in original order; Linux permissions replace Windows attributes; locale/natural sorting options pending |
 | Parent-directory `..` row | Partial | Enter navigates up; always first and excluded from marks; further original edge cases remain |
 | Status lines and selection totals | Partial | Focused metadata, marked count and file bytes implemented; recursive directory sizes pending |
@@ -29,6 +29,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Prefix quick search | Partial | Up/Down/Home/End, extend/shorten, Escape; wildcard aliases, Shift/Alt search combinations and IME pending |
 | Sort by name / extension / date / size | Partial | Directories first both ways; Ctrl+F3/F4/F5/F6; locale/natural sorting, options and persistence pending |
 | Sort by attributes | Partial | Header sorts basic Linux permission text; ACL/special bits and options pending |
+| Detailed list focus and Full Row Select | Implemented | Name-area focus and marking by default, with a persistent full-row option for both panels |
 | Navigation focus/selection memory | Partial | Focus memory retained; marks clear on navigation by default, with a persisted opt-in for session selection memory; large/slow/removable filesystem tests pending |
 | Hidden files | Partial | Native Qt semantics; Linux dot files and Windows hidden attribute fixtures |
 | View modes / zoom / thumbnails | Pending | Detailed, brief, icons, thumbnails, tiles and associated settings |
@@ -39,7 +40,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Archives / pack/unpack | Pending | Inventory built-ins and plugins; provider abstraction |
 | Clipboard / drag-and-drop | Pending | Paths, files, URI lists, inter-panel/desktop operations |
 | Compare/synchronize/checksums/rename tools | Pending | Inventory exact core/plugin boundaries |
-| Settings / themes / shortcuts / translations | Partial | Selection-preservation preference persisted; other settings, themes, shortcut editing and migration pending |
+| Settings / themes / shortcuts / translations | Partial | System/Light/Dark/Dracula, accents and custom JSON themes; selection preferences persist. Shortcut editing, migration and translations pending |
 | Plugin system and supplied plugins | Pending | Inventory every plugin, dependencies and available source; no Windows DLL ABI promise |
 | Registry / COM / Windows Shell integrations | Platform decision | Official upstream retains Windows integrations; decide Linux equivalents per command |
 | Network paths / FTP / remote providers | Pending | Native paths plus plugin functionality and missing dependencies |

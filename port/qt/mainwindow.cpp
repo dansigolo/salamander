@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mainwindow.h"
+#include "appearance.h"
 #include "filepanel.h"
 #include "fileview.h"
 #include "detailedfilemodel.h"
@@ -193,6 +194,21 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
         right_->setPreserveSelectionOnNavigation(enabled);
         settings_->setValue("panels/preserveSelectionOnNavigation", enabled); });
     optionsMenu->addAction(preserve);
+    auto* fullRow = optionsMenu->addAction(tr("Full Row Select"));
+    fullRow->setObjectName("fullRowSelect");
+    fullRow->setCheckable(true);
+    fullRow->setChecked(settings_->value("panels/fullRowSelect", false).toBool());
+    left_->view()->setFullRowSelect(fullRow->isChecked());
+    right_->view()->setFullRowSelect(fullRow->isChecked());
+    connect(fullRow, &QAction::toggled, this, [this](bool enabled)
+            {
+        left_->view()->setFullRowSelect(enabled);
+        right_->view()->setFullRowSelect(enabled);
+        settings_->setValue("panels/fullRowSelect", enabled); });
+    auto* appearance = optionsMenu->addAction(tr("Appearance…"));
+    appearance->setObjectName("appearance");
+    connect(appearance, &QAction::triggered, this, [this]
+            { Appearance::configure(*settings_, this); });
     auto* sortMenu = commandsMenu->addMenu(tr("Sort by"));
     const QString sortTexts[] = {tr("Sort by name"), tr("Sort by extension"), tr("Sort by date"), tr("Sort by size")};
     const QString sortNames[] = {"sortName", "sortExtension", "sortDate", "sortSize"};

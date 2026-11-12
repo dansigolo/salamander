@@ -86,3 +86,5 @@ F5 copies marked entries (or focus) to the other panel, with an editable existin
 ## F6 move milestone
 
 F6 moves to the other panel with native renames on the same filesystem. EXDEV uses staged copying, byte/metadata verification and checked source removal, with explicit partial/recovery reporting. Existing directories are not merged. See [MOVING.md](MOVING.md) for cancellation, metadata restrictions and recovery; [TESTING.md](TESTING.md) covers manual validation.
+
+The appearance dialog, custom theme format and Full Row Select are documented in [APPEARANCE.md](APPEARANCE.md).

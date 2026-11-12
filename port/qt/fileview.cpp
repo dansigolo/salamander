@@ -6,6 +6,119 @@
 #include <QFileSystemModel>
 #include <QScrollBar>
 #include <algorithm>
+#include <QAbstractItemDelegate>
+#include <QHeaderView>
+#include <QPainter>
+#include <QStyleOptionViewItem>
+
+void FileView::setFullRowSelect(bool enabled)
+{
+    fullRowSelect_ = enabled;
+    if (!enabled && currentIndex().isValid())
+        selectionModel()->setCurrentIndex(currentIndex().siblingAtColumn(0), QItemSelectionModel::NoUpdate);
+    viewport()->update();
+}
+
+QRect FileView::nameArea(const QModelIndex& index, const QRect& cell, QStyleOptionViewItem option) const
+{
+    option.rect = cell;
+    const int width = qMin(cell.width(), itemDelegateForIndex(index)->sizeHint(option, index).width());
+    return QStyle::alignedRect(layoutDirection(), Qt::AlignLeft, QSize(width, cell.height()), cell);
+}
+
+void FileView::drawRow(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
+{
+    // Marks stay row-based so keyboard commands and file operations share the same selection.
+    const auto name = index.siblingAtColumn(0);
+    const bool marked = selectionModel()->isSelected(name);
+    const bool focused = hasFocus() && currentIndex().siblingAtColumn(0) == name;
+    QRect row;
+    QRect nameRect;
+    for (int column = 0; column < header()->count(); ++column)
+    {
+        if (isColumnHidden(column))
+            continue;
+        const QRect cell(columnViewportPosition(column), option.rect.y(), columnWidth(column), option.rect.height());
+        row = row.united(cell);
+        const auto item = index.siblingAtColumn(column);
+        auto cellOption = option;
+        cellOption.rect = column == 0 ? nameArea(item, cell, option) : cell;
+        if (column == 0)
+            nameRect = cellOption.rect;
+        if (fullRowSelect_)
+            cellOption.rect = cell;
+        const bool selected = marked && (fullRowSelect_ || column == 0);
+        cellOption.state.setFlag(QStyle::State_Selected, selected);
+        cellOption.state.setFlag(QStyle::State_HasFocus, false);
+        cellOption.showDecorationSelected = true;
+        cellOption.viewItemPosition = QStyleOptionViewItem::OnlyOne;
+        if (selected)
+            painter->fillRect(cellOption.rect, cellOption.palette.brush(QPalette::Highlight));
+        itemDelegateForIndex(item)->paint(painter, cellOption, item);
+    }
+    const QRect focus = fullRowSelect_ ? row : nameRect;
+    if (focused && focus.isValid())
+    {
+        painter->save();
+        painter->setPen(option.palette.color(marked ? QPalette::HighlightedText : QPalette::Text));
+        painter->drawRect(focus.adjusted(0, 0, -1, -1));
+        painter->restore();
+    }
+}
+
+bool FileView::acceptsClick(const QMouseEvent* event) const
+{
+    const QPoint pos = event->position().toPoint();
+    const auto index = indexAt(pos);
+    if (!index.isValid())
+        return false;
+    if (fullRowSelect_)
+        return true;
+    QStyleOptionViewItem option;
+    initViewItemOption(&option);
+    return index.column() == 0 && nameArea(index, visualRect(index), option).contains(pos);
+}
+
+void FileView::mousePressEvent(QMouseEvent* event)
+{
+    itemPressed_ = acceptsClick(event);
+    if (itemPressed_)
+        QTreeView::mousePressEvent(event);
+    else
+        event->accept();
+}
+
+void FileView::mouseMoveEvent(QMouseEvent* event)
+{
+    if (event->buttons() == Qt::NoButton || itemPressed_)
+        QTreeView::mouseMoveEvent(event);
+    else
+        event->accept();
+}
+
+void FileView::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (itemPressed_)
+        QTreeView::mouseReleaseEvent(event);
+    else
+        event->accept();
+    itemPressed_ = false;
+}
+
+void FileView::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    itemPressed_ = acceptsClick(event);
+    if (itemPressed_)
+        QTreeView::mouseDoubleClickEvent(event);
+    else
+        event->accept();
+}
+
+QModelIndex FileView::moveCursor(CursorAction action, Qt::KeyboardModifiers modifiers)
+{
+    const auto index = QTreeView::moveCursor(action, modifiers);
+    return fullRowSelect_ ? index : index.siblingAtColumn(0);
+}
 
 bool FileView::focusNextPrevChild(bool)
 {

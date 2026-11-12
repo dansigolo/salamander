@@ -51,25 +51,31 @@ FilePanel::FilePanel(const QString& path, QWidget* parent) : QWidget(parent)
     const int widths[] = {230, 60, 85, 95, 80, 100};
     for (int column = 0; column < DetailedFileModel::ColumnCount; ++column)
         view_->setColumnWidth(column, widths[column]);
-    pathBar_ = new QWidget(this);
-    pathBar_->setObjectName("panelPathBar");
-    auto* toolbar = new QToolBar(pathBar_);
+    auto* pathBar = new QWidget(this);
+    pathBar->setObjectName("panelPathBar");
+    auto* toolbar = new QToolBar(pathBar);
     toolbar->setIconSize(QSize(16, 16));
     back_ = toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowBack), tr("Back"), this, &FilePanel::goBack);
     forward_ = toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowForward), tr("Forward"), this, &FilePanel::goForward);
     toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowUp), tr("Parent directory"), this, &FilePanel::goUp);
-    path_ = new QComboBox(pathBar_);
+    path_ = new QComboBox(pathBar);
     path_->setObjectName("directoryPath");
     path_->setEditable(true);
     path_->setInsertPolicy(QComboBox::NoInsert);
     path_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     path_->setMinimumWidth(100);
     path_->setAccessibleName(tr("Directory path and history"));
-    space_ = new QLabel(pathBar_);
+    space_ = new QLabel(pathBar);
     space_->setObjectName("freeSpace");
-    auto* row = new QHBoxLayout(pathBar_);
+    auto* row = new QHBoxLayout(pathBar);
     row->setContentsMargins(2, 0, 2, 0);
     row->setSpacing(3);
+    activeIndicator_ = new QWidget(pathBar);
+    activeIndicator_->setObjectName("activePanelIndicator");
+    activeIndicator_->setFixedWidth(3);
+    activeIndicator_->setAutoFillBackground(true);
+    activeIndicator_->setBackgroundRole(QPalette::Window);
+    row->addWidget(activeIndicator_);
     row->addWidget(toolbar);
     row->addWidget(path_, 1);
     row->addWidget(space_);
@@ -80,7 +86,7 @@ FilePanel::FilePanel(const QString& path, QWidget* parent) : QWidget(parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(2, 0, 2, 0);
     layout->setSpacing(2);
-    layout->addWidget(pathBar_);
+    layout->addWidget(pathBar);
     layout->addWidget(view_);
     layout->addWidget(status_);
     connect(path_->lineEdit(), &QLineEdit::returnPressed, this, [this]
@@ -327,10 +333,7 @@ void FilePanel::goForward()
 }
 void FilePanel::setActive(bool active)
 {
-    auto colors = palette();
-    colors.setColor(QPalette::Window, active ? palette().color(QPalette::Highlight).lighter(175) : palette().color(QPalette::AlternateBase));
-    pathBar_->setPalette(colors);
-    pathBar_->setAutoFillBackground(true);
+    activeIndicator_->setBackgroundRole(active ? QPalette::Link : QPalette::Window);
 }
 void FilePanel::refreshSpace()
 {
