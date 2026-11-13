@@ -558,6 +558,89 @@ private slots:
         QCOMPARE(file.readAll(), content.toUtf8());
     }
 
+    void f4ConfiguresAndOpensTheFocusedFileInAnExternalEditor()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QDir root(temporary.path());
+        QVERIFY(root.mkdir("left"));
+        QVERIFY(root.mkdir("right"));
+        QVERIFY(root.mkdir("right/folder"));
+        const auto focused = root.filePath(QString::fromUtf8("right/relatório com espaços & $.txt"));
+        const auto marked = root.filePath("right/marked.txt");
+        const auto log = root.filePath("editor arguments.txt");
+        const auto program = root.filePath("test editor");
+        const auto write = [](const QString& path, const QByteArray& bytes)
+        {
+            QFile file(path);
+            return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
+        };
+        QVERIFY(write(focused, "original"));
+        QVERIFY(write(marked, "marked"));
+        QVERIFY(write(program, "#!/bin/sh\nprintf '%s\\n' \"$PWD\" \"$@\" > \"$1\"\n"));
+        QVERIFY(QFile::setPermissions(program, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
+
+        QSettings settings(root.filePath("settings.ini"), QSettings::IniFormat);
+        MainWindow window(root.filePath("left"), root.filePath("right"), false, &settings);
+        window.show();
+        window.activateWindow();
+        auto* panel = window.rightPanel();
+        auto* view = panel->view();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        QTRY_VERIFY(panel->visibleIndex(focused).isValid());
+        QTRY_VERIFY(panel->visibleIndex(marked).isValid());
+        QTRY_VERIFY(panel->visibleIndex(root.filePath("right/folder")).isValid());
+        QCOMPARE(window.activePanel(), panel);
+        auto* edit = window.findChild<QAction*>("editFile");
+        QVERIFY(edit);
+        view->selectionModel()->setCurrentIndex(panel->visibleIndex(root.filePath("right/folder")), QItemSelectionModel::NoUpdate);
+        QVERIFY(!edit->isEnabled());
+        view->selectionModel()->select(panel->visibleIndex(marked), QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        view->selectionModel()->setCurrentIndex(panel->visibleIndex(focused), QItemSelectionModel::NoUpdate);
+        QVERIFY(edit->isEnabled());
+
+        const auto closeSettings = [&](bool save)
+        {
+            auto* dialog = window.findChild<QDialog*>("editorSettings");
+            if (!dialog)
+                return;
+            dialog->findChild<QLineEdit*>("editorProgram")->setText(program);
+            dialog->findChild<QLineEdit*>("editorArguments")->setText(QString("\"%1\" \"two words\"").arg(log));
+            auto* buttons = dialog->findChild<QDialogButtonBox*>();
+            buttons->button(save ? QDialogButtonBox::Save : QDialogButtonBox::Cancel)->click();
+        };
+        QTimer::singleShot(0, &window, [&]
+                           { closeSettings(false); });
+        QTest::keyClick(view, Qt::Key_F4);
+        QVERIFY(!settings.contains("editor/program"));
+        QVERIFY(!QFileInfo::exists(log));
+        window.activateWindow();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        QTimer::singleShot(0, &window, [&]
+                           { closeSettings(true); });
+        QTest::keyClick(view, Qt::Key_F4);
+        settings.sync();
+        QSettings reopened(settings.fileName(), QSettings::IniFormat);
+        QCOMPARE(reopened.value("editor/program").toString(), program);
+        const auto readLog = [&]
+        {
+            QFile output(log);
+            return output.open(QIODevice::ReadOnly) ? output.readAll() : QByteArray();
+        };
+        const auto expected = (root.filePath("right") + "\n" + log + "\ntwo words\n" + focused + "\n").toUtf8();
+        QTRY_COMPARE(readLog(), expected);
+        QCOMPARE(panel->selectedPaths(), QStringList{marked});
+
+        settings.setValue("editor/program", root.filePath("missing editor"));
+        edit->trigger();
+        QTRY_VERIFY(window.findChild<QMessageBox*>("editorError"));
+        const auto* error = window.findChild<QMessageBox*>("editorError");
+        QVERIFY(error->text().contains("missing editor"));
+        QVERIFY(error->text().contains(focused));
+    }
+
     void f8ConfirmsAndTrashesMarkedItemsWithRestoreMetadata()
     {
         const QDir testRoot(qEnvironmentVariable("SALAMANDER_TRASH_TEST_ROOT", QDir::homePath()));

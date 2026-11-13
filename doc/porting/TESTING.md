@@ -87,7 +87,7 @@ A barra mostra bytes planejados processados, incluindo itens pulados; o resumo f
 
 ## Limitações esperadas nesta etapa
 
-F2 (renomear), F3 (visualizar), F5 (copiar), F6 (mover), F7 (criar pasta) e F8 (lixeira) estão ativos. F4, F9 e F11–F12 permanecem desabilitados: editar, menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
+F2 (renomear), F3 (visualizar), F4 (editar), F5 (copiar), F6 (mover), F7 (criar pasta) e F8 (lixeira) estão ativos. F9 e F11–F12 permanecem desabilitados: menu de comandos do usuário e conexões ainda precisam ser implementados. O campo **Go to** é navegação por caminho; a linha de comandos do original permanece pendente. Os ícones são do Qt/tema atual e a configuração de barras/favoritos ainda não é persistente. Não há cálculo recursivo de tamanho de pastas, paridade completa de plugins, máscaras avançadas de busca rápida ou todos os modos de visualização.
 
 ## Testes automatizados
 
@@ -156,3 +156,10 @@ TMPDIR="$HOME" python3 tools/qt_smoke_fixture.py --launch
 1. Abra a fixture com `python3 tools/qt_smoke_fixture.py --launch`. Marque `alpha.txt`, foque `relatório.txt` e pressione **F3**. Confira que a janela mostra o arquivo em foco.
 2. Use **Ctrl+F** para localizar texto, **F3** para avançar e **Shift+F3** para voltar. Alterne **Wrap lines** e feche com **Esc**.
 3. Confira o estado de um arquivo vazio e o aviso para um binário. Para um texto maior que 1 MiB, a janela deve mostrar o início e informar o limite.
+
+
+## Editor externo — F4
+
+1. Abra a fixture com `python3 tools/qt_smoke_fixture.py --launch`. Marque `alpha.txt`, foque `name with spaces.txt` e pressione **F4**.
+2. Na primeira vez, informe o executável do editor, por exemplo `xed` no Mint. Deixe **Arguments** vazio e clique em **Save**. Confira se o editor abriu o arquivo em foco. Salve uma alteração e confira com **F3**.
+3. Troque o editor em **Options → External editor…** e reabra o Salamander para conferir a persistência. Um executável inexistente deve produzir um aviso.

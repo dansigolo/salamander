@@ -20,7 +20,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Parent-directory `..` row | Partial | Enter navigates up; always first and excluded from marks; further original edge cases remain |
 | Status lines and selection totals | Partial | Focused metadata, marked count and file bytes implemented; recursive directory sizes pending |
 | Command line | Pending | Working directory, history, quoting, shell integration |
-| Bottom function-key bar | Partial | F1/F2/F3/F5/F6/F7/F8/F10 work; remaining keys disabled until their operations exist |
+| Bottom function-key bar | Partial | F1/F2/F3/F4/F5/F6/F7/F8/F10 work; remaining keys disabled until their operations exist |
 | Focus separate from selected items | Partial | Keyboard covered; mouse/rubber-band modes and visual indicators pending |
 | Insert and Space | Partial | Toggle and advance; background directory-size calculation pending |
 | Shift+navigation | Partial | Select/unselect ranges; detailed keyboard fixtures added; other view modes pending |
@@ -36,7 +36,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Copy/move/rename/mkdir/delete/trash | Partial | F2/F7, F5 copy, F6 move and F8 desktop Trash run in background. F8 confirms first and reports partial results. Directory merging, permanent delete and complete cross-filesystem metadata support remain pending; see OPERATIONS.md, COPYING.md and MOVING.md |
 | Filesystem watching and refresh | Partial | QFileSystemModel watching with selection-preservation regression; reconnect/slow-storage tests pending |
 | Search/find dialog | Pending | Content/metadata searches, results actions, cancel and progress |
-| Internal viewer / external editor | Partial | F3 views the focused file in a read-only text window with search, wrapping and a bounded preview. Hex mode, additional encodings and F4 editing remain pending |
+| Internal viewer / external editor | Partial | F3 views the focused file in a read-only text window with search, wrapping and a bounded preview. F4 opens the focused file in a configured external editor. Hex mode, additional encodings, editor associations and Shift+F4 remain pending |
 | Archives / pack/unpack | Pending | Inventory built-ins and plugins; provider abstraction |
 | Clipboard / drag-and-drop | Pending | Paths, files, URI lists, inter-panel/desktop operations |
 | Compare/synchronize/checksums/rename tools | Pending | Inventory exact core/plugin boundaries |

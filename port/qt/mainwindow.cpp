@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mainwindow.h"
 #include "textviewer.h"
+#include "externaleditor.h"
 #include "appearance.h"
 #include "filepanel.h"
 #include "fileview.h"
@@ -128,7 +129,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     QList<QAction*> operations;
     for (int i = 0; i < 7; ++i)
     {
-        auto* action = (i != 2) ? new QAction(operationTexts[i], this) : unavailable(operationTexts[i], operationNames[i]);
+        auto* action = new QAction(operationTexts[i], this);
         action->setObjectName(operationNames[i]);
         filesMenu->addAction(action);
         operations.append(action);
@@ -137,6 +138,10 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     viewAction_->setShortcut(QKeySequence(Qt::Key_F3));
     viewAction_->setAutoRepeat(false);
     connect(viewAction_, &QAction::triggered, this, &MainWindow::viewFile);
+    editAction_ = operations[2];
+    editAction_->setShortcut(QKeySequence(Qt::Key_F4));
+    editAction_->setAutoRepeat(false);
+    connect(editAction_, &QAction::triggered, this, &MainWindow::editFile);
     copyAction_ = operations[3];
     copyAction_->setShortcut(QKeySequence(Qt::Key_F5));
     connect(copyAction_, &QAction::triggered, this, [this]
@@ -160,7 +165,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
         operationStatus_->setVisible(busy);
         updateOperationActions(); });
     connect(controller_, &OperationController::finished, this, &MainWindow::finishOperation);
-    for (int i : {0, 1, 3, 4, 5, 6})
+    for (int i = 0; i < operations.size(); ++i)
     {
         operations[i]->setIcon(style()->standardIcon(i == 6 ? QStyle::SP_TrashIcon : QStyle::SP_FileIcon));
         top->addAction(operations[i]);
@@ -217,6 +222,10 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     appearance->setObjectName("appearance");
     connect(appearance, &QAction::triggered, this, [this]
             { Appearance::configure(*settings_, this); });
+    auto* editor = optionsMenu->addAction(tr("External editor…"));
+    editor->setObjectName("configureEditor");
+    connect(editor, &QAction::triggered, this, [this]
+            { ExternalEditor::configure(*settings_, this); });
     auto* sortMenu = commandsMenu->addMenu(tr("Sort by"));
     const QString sortTexts[] = {tr("Sort by name"), tr("Sort by extension"), tr("Sort by date"), tr("Sort by size")};
     const QString sortNames[] = {"sortName", "sortExtension", "sortDate", "sortSize"};
@@ -288,7 +297,7 @@ MainWindow::MainWindow(const QString& leftPath, const QString& rightPath, bool i
     help->setObjectName("showHelp");
     help->setShortcut(QKeySequence(Qt::Key_F1));
     connect(help, &QAction::triggered, this, [this]
-            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF3: view the focused file\nF5: copy to the other panel\nF6: move to the other panel\nF7: create directory\nF8: move to Trash\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
+            { QMessageBox::information(this, tr("Keyboard navigation"), tr("F2: rename marked items, or the focused item\nF3: view the focused file\nF4: edit the focused file\nF5: copy to the other panel\nF6: move to the other panel\nF7: create directory\nF8: move to Trash\nTab: switch panels\nInsert / Space: mark and advance\nShift + arrows: select or unselect\nCtrl+A / Ctrl+D: select all / none\nType a name: quick search; Esc ends search\nBackspace: parent directory\nAlt+Left / Alt+Right: history\nCtrl+F3/F4/F5/F6: sort by name/extension/date/size\nCtrl+H: hidden files\nCtrl+L: go to directory\nF10: menus")); });
     helpMenu->addAction(help);
     auto* about = helpMenu->addAction(tr("About"));
     connect(about, &QAction::triggered, this, [this]
@@ -447,7 +456,9 @@ void MainWindow::updateOperationActions()
         return;
     const bool available = !controller_->isBusy() && !copySession_ && !copyController_->isBusy() && !dialogOpen_ && !renameSession_;
     createDirectoryAction_->setEnabled(available);
-    viewAction_->setEnabled(!active_->focusedFile().isEmpty());
+    const bool focusedFile = !active_->focusedFile().isEmpty();
+    viewAction_->setEnabled(focusedFile);
+    editAction_->setEnabled(available && focusedFile);
     const bool hasItems = available && !active_->operationNames().isEmpty();
     renameAction_->setEnabled(hasItems);
     copyAction_->setEnabled(hasItems);
@@ -459,6 +470,13 @@ void MainWindow::viewFile()
     const auto path = active_->focusedFile();
     if (!path.isEmpty())
         (new TextViewer(path, this))->show();
+}
+
+void MainWindow::editFile()
+{
+    const auto path = active_->focusedFile();
+    if (!path.isEmpty())
+        ExternalEditor::open(path, *settings_, this);
 }
 
 void MainWindow::trashItems()

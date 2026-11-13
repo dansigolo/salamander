@@ -71,7 +71,7 @@ Development branch: `improvement/salamander_for_linux`. Keep focused commits, ru
 
 ## Interface milestone
 
-The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F3 view, F5 copy, F6 move, F7 mkdir and F8 Trash are enabled; remaining file operations are disabled.
+The Qt window now follows the original menu order and includes top, places/volumes and function-key bars. Panels expose Name/Ext/Size/Date/Time/Attr, a nonselectable parent row, back/forward history, path dropdowns, active-panel indication and asynchronous free-space queries. POSIX permissions replace Windows attributes. Favorites added here are session-only. The Go to field navigates paths; it does not execute commands. F2 rename, F3 view, F4 edit, F5 copy, F6 move, F7 mkdir and F8 Trash are enabled; remaining file operations are disabled.
 
 See [TESTING.md](TESTING.md) for compilation, disposable fixtures and a complete manual/automated test guide. Optional fixture launcher: `python3 tools/qt_smoke_fixture.py --launch`.
 
@@ -91,3 +91,5 @@ The appearance dialog, custom theme format and Full Row Select are documented in
 
 
 F3 follows the upstream focused-file shortcut. The internal viewer opens a read-only window and reads up to the first 1 MiB of a regular file in a worker. It supports UTF-8, BOM-marked UTF-16 and a labeled ISO-8859-1 fallback. The reader follows links to regular files and rejects special files. Common binary files are identified by control characters in the decoded preview. Search and word wrap apply to the displayed text.
+
+F4 launches a configured external editor for the focused file. Set the executable and optional arguments in **Options → External editor…**. Use an executable on PATH or its absolute path, and double quotes for an argument containing spaces. The application appends the focused file as a separate argument and launches the editor directly in that file’s directory. The editor handles saving and can stay open after Salamander exits. Terminal editors require configuring a terminal emulator to launch them.

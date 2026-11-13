@@ -35,6 +35,7 @@ private:
     void showCopyConflict(const CopyOperations::Conflict& conflict, quint64 token);
     void createDirectory();
     void viewFile();
+    void editFile();
     void trashItems();
     void finishTrash(const FileOperations::Result& result);
     void renameItems();
@@ -60,6 +61,7 @@ private:
     OperationController* controller_;
     CopyController* copyController_;
     QAction* viewAction_;
+    QAction* editAction_;
     QAction* copyAction_;
     QAction* moveAction_;
     bool movingSession_ = false;
