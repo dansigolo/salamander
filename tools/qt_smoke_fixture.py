@@ -4,8 +4,30 @@
 import argparse
 from pathlib import Path
 import shlex
+import struct
 import subprocess
 import tempfile
+import zlib
+
+
+def write_test_image(path):
+    """Write an RGB test pattern with no third-party Python dependencies."""
+    width, height = 960, 540
+    colors = [(58, 99, 179), (35, 155, 125), (231, 173, 55), (159, 88, 176)]
+    rows = []
+    for y in range(height):
+        row = bytearray([0])  # PNG scanline filter: None
+        for x in range(width):
+            color = colors[(x // 240 + y // 135) % len(colors)]
+            row.extend(color)
+        rows.append(row)
+
+    def chunk(kind, payload):
+        return struct.pack('>I', len(payload)) + kind + payload + struct.pack('>I', zlib.crc32(kind + payload))
+
+    header = struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header)
+                     + chunk(b'IDAT', zlib.compress(b''.join(rows))) + chunk(b'IEND', b''))
 
 
 def main():
@@ -40,6 +62,7 @@ def main():
     (left / 'run-me.sh').chmod(0o755)
     (left / 'alpha-link.txt').symlink_to('alpha.txt')
     (right / 'README.txt').write_text('Independent right panel\n')
+    write_test_image(left / 'imagem-teste.png')
     if args.large_mib:
         with (left / 'large-copy-test.bin').open('wb') as large:
             large.truncate(args.large_mib * 1024 * 1024)

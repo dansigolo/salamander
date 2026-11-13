@@ -4,6 +4,10 @@
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFileInfo>
+#include <QFile>
+#include <QImageReader>
+#include <QPainter>
+#include <QScrollArea>
 #include <QFontDatabase>
 #include <QFutureWatcher>
 #include <QHBoxLayout>
@@ -12,8 +16,94 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QShortcut>
+#include <QStyle>
+#include <utility>
 #include <QVBoxLayout>
 #include <QtConcurrent>
+
+namespace
+{
+    struct Preview
+    {
+        TextPreview::Result text;
+        QImage image;
+        QByteArray format;
+    };
+
+    Preview readPreview(const QString& path)
+    {
+        Preview result;
+        QFile file;
+        result.text.error = TextPreview::openRegularFile(path, file);
+        if (!result.text.error.isEmpty())
+            return result;
+
+        QImageReader reader(&file);
+        reader.setDecideFormatFromContent(true);
+        if (!reader.canRead())
+        {
+            if (file.seek(0))
+                result.text = TextPreview::read(file);
+            else
+                result.text.error = file.errorString();
+            return result;
+        }
+
+        result.format = reader.format();
+        if (result.format != "png" && result.format != "jpeg" && result.format != "bmp" &&
+            result.format != "gif" && result.format != "webp")
+        {
+            result.text.error = QObject::tr("This image format is not supported by the preview.");
+            return result;
+        }
+        constexpr qint64 maxImageBytes = 64 * 1024 * 1024;
+        constexpr qint64 maxPixels = 24 * 1024 * 1024;
+        const auto size = reader.size();
+        if (file.size() > maxImageBytes || size.width() > 16384 || size.height() > 16384 ||
+            qint64(size.width()) * size.height() > maxPixels)
+        {
+            result.text.error = QObject::tr("This image exceeds the preview size limit.");
+            return result;
+        }
+        if (size.isEmpty())
+        {
+            result.text.error = QObject::tr("Could not read the image dimensions.");
+            return result;
+        }
+        reader.setAutoTransform(true);
+        result.image = reader.read();
+        if (result.image.isNull())
+            result.text.error = reader.errorString();
+        return result;
+    }
+
+    class ImageCanvas final : public QWidget
+    {
+    public:
+        explicit ImageCanvas(QImage image) : image_(std::move(image))
+        {
+            setObjectName("viewerImage");
+            setAccessibleName(tr("Image preview"));
+        }
+
+        QSize sizeHint() const override { return image_.size(); }
+
+    protected:
+        void paintEvent(QPaintEvent*) override
+        {
+            auto target = image_.size();
+            if (target.width() > width() || target.height() > height())
+                target.scale(size(), Qt::KeepAspectRatio);
+            const QRect area = QStyle::alignedRect(layoutDirection(), Qt::AlignCenter, target, rect());
+            QPainter painter(this);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform);
+            painter.drawImage(area, image_);
+        }
+
+    private:
+        QImage image_;
+    };
+} // namespace
 
 TextViewer::TextViewer(const QString& path, QWidget* parent) : QDialog(parent)
 {
@@ -28,7 +118,9 @@ TextViewer::TextViewer(const QString& path, QWidget* parent) : QDialog(parent)
     address->setAccessibleName(tr("File path"));
     layout->addWidget(address);
 
-    auto* tools = new QHBoxLayout;
+    auto* textTools = new QWidget(this);
+    auto* tools = new QHBoxLayout(textTools);
+    tools->setContentsMargins(0, 0, 0, 0);
     query_ = new QLineEdit(this);
     query_->setObjectName("viewerSearch");
     query_->setAccessibleName(tr("Find in file"));
@@ -42,7 +134,7 @@ TextViewer::TextViewer(const QString& path, QWidget* parent) : QDialog(parent)
     tools->addWidget(previous);
     tools->addWidget(next);
     tools->addWidget(wrap);
-    layout->addLayout(tools);
+    layout->addWidget(textTools);
 
     text_ = new QPlainTextEdit(this);
     text_->setObjectName("viewerText");
@@ -89,11 +181,36 @@ TextViewer::TextViewer(const QString& path, QWidget* parent) : QDialog(parent)
     query_->setEnabled(false);
     previous->setEnabled(false);
     next->setEnabled(false);
-    auto* watcher = new QFutureWatcher<TextPreview::Result>(this);
-    connect(watcher, &QFutureWatcher<TextPreview::Result>::finished, this, [this, watcher, status, previous, next]
+    auto* watcher = new QFutureWatcher<Preview>(this);
+    connect(watcher, &QFutureWatcher<Preview>::finished, this, [this, watcher, layout, textTools, status, previous, next]
             {
-        const auto result = watcher->result();
+        auto preview = watcher->result();
         watcher->deleteLater();
+        if (!preview.image.isNull())
+        {
+            const auto dimensions = preview.image.size();
+            auto* scroll = new QScrollArea(this);
+            scroll->setAlignment(Qt::AlignCenter);
+            scroll->setWidgetResizable(true);
+            auto* canvas = new ImageCanvas(std::move(preview.image));
+            scroll->setWidget(canvas);
+            auto* actual = new QCheckBox(tr("Actual size"), this);
+            actual->setObjectName("viewerActualSize");
+            connect(actual, &QCheckBox::toggled, scroll, [scroll, canvas](bool enabled)
+            {
+                scroll->setWidgetResizable(!enabled);
+                if (enabled)
+                    canvas->resize(canvas->sizeHint());
+            });
+            textTools->hide();
+            text_->hide();
+            layout->insertWidget(1, actual);
+            layout->insertWidget(2, scroll, 1);
+            status->setText(tr("%1 · %2 × %3 pixels").arg(QString::fromLatin1(preview.format.toUpper())).arg(dimensions.width()).arg(dimensions.height()));
+            scroll->setFocus();
+            return;
+        }
+        const auto& result = preview.text;
         if (!result.error.isEmpty())
         {
             status->setText(tr("Cannot display this file. %1").arg(result.error));
@@ -106,7 +223,7 @@ TextViewer::TextViewer(const QString& path, QWidget* parent) : QDialog(parent)
         previous->setEnabled(query_->isEnabled());
         next->setEnabled(query_->isEnabled()); });
     watcher->setFuture(QtConcurrent::run([path]
-                                         { return TextPreview::read(path); }));
+                                         { return readPreview(path); }));
     text_->setFocus();
 }
 

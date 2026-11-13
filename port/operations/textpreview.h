@@ -2,6 +2,8 @@
 #pragma once
 #include <QString>
 
+class QFile;
+
 namespace TextPreview
 {
     inline constexpr qsizetype byteLimit = 1024 * 1024;
@@ -15,5 +17,7 @@ namespace TextPreview
     };
 
     // Read-only, bounded I/O. Call on a worker thread.
+    QString openRegularFile(const QString& path, QFile& file);
+    Result read(QFile& file);
     Result read(const QString& path);
 } // namespace TextPreview

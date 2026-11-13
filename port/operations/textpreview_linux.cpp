@@ -33,10 +33,10 @@ namespace TextPreview
             return result;
         }
 
-        Result nativeFailure(int error)
+        QString nativeError(int error)
         {
             const auto message = std::system_category().message(error);
-            return failure(QString::fromLocal8Bit(message.data(), message.size()));
+            return QString::fromLocal8Bit(message.data(), message.size());
         }
 
         Result decode(QByteArray bytes)
@@ -67,38 +67,51 @@ namespace TextPreview
         const auto code = character.unicode();
         return code == 0x7f || (code < 0x20 && code != '\t' && code != '\r' && code != '\n' && code != '\f'); });
             if (binary)
-                return failure(QCoreApplication::translate("TextPreview", "This file appears to be binary. The viewer currently displays text files."));
+                return failure(QCoreApplication::translate("TextPreview", "This file appears to be binary. The viewer supports text and recognized images."));
             return result;
         }
     } // namespace
 
-    Result read(const QString& path)
+    QString openRegularFile(const QString& path, QFile& file)
     {
         if (!QDir::isAbsolutePath(path) || path.contains(QChar::Null))
-            return failure(QCoreApplication::translate("TextPreview", "Choose a file with a valid absolute path."));
+            return QCoreApplication::translate("FilePreview", "Choose a file with a valid absolute path.");
         const auto nativePath = QFile::encodeName(path);
         // Inspect the target before opening it for I/O. O_PATH does not open FIFOs or devices for reading.
         const Descriptor entry{::open(nativePath.constData(), O_PATH | O_CLOEXEC)};
         if (entry.fd < 0)
-            return nativeFailure(errno);
+            return nativeError(errno);
         struct stat metadata
         {
         };
         if (::fstat(entry.fd, &metadata) != 0)
-            return nativeFailure(errno);
+            return nativeError(errno);
         if (!S_ISREG(metadata.st_mode))
-            return failure(QCoreApplication::translate("TextPreview", "Choose a regular file."));
+            return QCoreApplication::translate("FilePreview", "Choose a regular file.");
 
         const auto procPath = QByteArray("/proc/self/fd/") + QByteArray::number(entry.fd);
-        const Descriptor input{::open(procPath.constData(), O_RDONLY | O_NONBLOCK | O_CLOEXEC)};
-        if (input.fd < 0)
-            return nativeFailure(errno);
-        QFile file;
-        if (!file.open(input.fd, QIODevice::ReadOnly, QFileDevice::DontCloseHandle))
-            return failure(file.errorString());
+        const int fd = ::open(procPath.constData(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (fd < 0)
+            return nativeError(errno);
+        if (!file.open(fd, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle))
+        {
+            ::close(fd);
+            return file.errorString();
+        }
+        return {};
+    }
+
+    Result read(QFile& file)
+    {
         auto bytes = file.read(byteLimit + 1);
         if (file.error() != QFileDevice::NoError)
             return failure(file.errorString());
         return decode(std::move(bytes));
+    }
+    Result read(const QString& path)
+    {
+        QFile file;
+        const auto error = openRegularFile(path, file);
+        return error.isEmpty() ? read(file) : failure(error);
     }
 } // namespace TextPreview

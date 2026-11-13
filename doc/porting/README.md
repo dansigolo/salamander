@@ -90,6 +90,8 @@ F6 moves to the other panel with native renames on the same filesystem. EXDEV us
 The appearance dialog, custom theme format and Full Row Select are documented in [APPEARANCE.md](APPEARANCE.md).
 
 
-F3 follows the upstream focused-file shortcut. The internal viewer opens a read-only window and reads up to the first 1 MiB of a regular file in a worker. It supports UTF-8, BOM-marked UTF-16 and a labeled ISO-8859-1 fallback. The reader follows links to regular files and rejects special files. Common binary files are identified by control characters in the decoded preview. Search and word wrap apply to the displayed text.
+F3 follows the upstream focused-file shortcut. The internal viewer opens a read-only window and detects supported raster images by content. For text, it reads up to the first 1 MiB of a regular file in a worker. It supports UTF-8, BOM-marked UTF-16 and a labeled ISO-8859-1 fallback. The reader follows links to regular files and rejects special files. Common binary files are identified by control characters in the decoded preview. Search and word wrap apply to the displayed text.
 
 F4 launches a configured external editor for the focused file. Set the executable and optional arguments in **Options → External editor…**. Use an executable on PATH or its absolute path, and double quotes for an argument containing spaces. The application appends the focused file as a separate argument and launches the editor directly in that file’s directory. The editor handles saving and can stay open after Salamander exits. Terminal editors require configuring a terminal emulator to launch them.
+
+Image preview supports PNG, JPEG, BMP, GIF and WebP where Qt has the corresponding decoder. It shows the first frame of animated files, applies supported orientation metadata and offers fit-to-window and actual size. Decoding runs on a worker and is limited to 64 MiB of input, 24 Mi pixels and 16384 pixels per side. Qt may enforce a lower allocation limit.

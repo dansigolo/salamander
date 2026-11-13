@@ -17,6 +17,8 @@
 #include <QPointer>
 #include <QPaintEvent>
 #include <QPlainTextEdit>
+#include <QCheckBox>
+#include <QImage>
 #include <QLabel>
 #include <QStandardItemModel>
 #include <QAction>
@@ -556,6 +558,42 @@ private slots:
         QCOMPARE(panel->selectedPaths(), QStringList{root.filePath("folder")});
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll(), content.toUtf8());
+    }
+
+    void f3DetectsImageContentsAndOffersActualSize()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        const auto path = temporary.filePath("image-without-extension");
+        QImage image(1000, 600, QImage::Format_RGB32);
+        image.fill(Qt::blue);
+        QVERIFY(image.save(path, "PNG"));
+
+        MainWindow window(temporary.path(), temporary.path(), false);
+        window.show();
+        window.activateWindow();
+        auto* panel = window.leftPanel();
+        auto* view = panel->view();
+        view->setFocus();
+        QTRY_VERIFY(view->hasFocus());
+        QTRY_VERIFY(panel->visibleIndex(path).isValid());
+        view->selectionModel()->setCurrentIndex(panel->visibleIndex(path), QItemSelectionModel::NoUpdate);
+        QTest::keyClick(view, Qt::Key_F3);
+        auto* viewer = window.findChild<QDialog*>("textViewer");
+        QVERIFY(viewer);
+        QTRY_VERIFY(viewer->findChild<QWidget*>("viewerImage"));
+        auto* canvas = viewer->findChild<QWidget*>("viewerImage");
+        auto* actual = viewer->findChild<QCheckBox*>("viewerActualSize");
+        QVERIFY(actual && !actual->isChecked());
+        QVERIFY(canvas->width() < image.width());
+        QVERIFY(viewer->findChild<QLabel*>("viewerStatus")->text().contains(QString::fromUtf8("PNG · 1000 × 600")));
+        const auto rendered = canvas->grab().toImage();
+        QCOMPARE(rendered.pixelColor(rendered.rect().center()), QColor(Qt::blue));
+        actual->click();
+        QCOMPARE(canvas->size(), image.size());
+        viewer->activateWindow();
+        QTest::keyClick(actual, Qt::Key_Escape);
+        QTRY_VERIFY(!window.findChild<QDialog*>("textViewer"));
     }
 
     void f4ConfiguresAndOpensTheFocusedFileInAnExternalEditor()

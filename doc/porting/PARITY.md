@@ -36,7 +36,7 @@ Statuses: partial = implemented subset; pending = not implemented; platform deci
 | Copy/move/rename/mkdir/delete/trash | Partial | F2/F7, F5 copy, F6 move and F8 desktop Trash run in background. F8 confirms first and reports partial results. Directory merging, permanent delete and complete cross-filesystem metadata support remain pending; see OPERATIONS.md, COPYING.md and MOVING.md |
 | Filesystem watching and refresh | Partial | QFileSystemModel watching with selection-preservation regression; reconnect/slow-storage tests pending |
 | Search/find dialog | Pending | Content/metadata searches, results actions, cancel and progress |
-| Internal viewer / external editor | Partial | F3 views the focused file in a read-only text window with search, wrapping and a bounded preview. F4 opens the focused file in a configured external editor. Hex mode, additional encodings, editor associations and Shift+F4 remain pending |
+| Internal viewer / external editor | Partial | F3 previews text and common raster images. Images are detected by content and can be fit to the window or shown at actual size. F4 opens the focused file in a configured external editor. Hex mode, advanced PictView functions, additional encodings, editor associations and Shift+F4 remain pending |
 | Archives / pack/unpack | Pending | Inventory built-ins and plugins; provider abstraction |
 | Clipboard / drag-and-drop | Pending | Paths, files, URI lists, inter-panel/desktop operations |
 | Compare/synchronize/checksums/rename tools | Pending | Inventory exact core/plugin boundaries |

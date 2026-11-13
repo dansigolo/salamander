@@ -163,3 +163,7 @@ TMPDIR="$HOME" python3 tools/qt_smoke_fixture.py --launch
 1. Abra a fixture com `python3 tools/qt_smoke_fixture.py --launch`. Marque `alpha.txt`, foque `name with spaces.txt` e pressione **F4**.
 2. Na primeira vez, informe o executável do editor, por exemplo `xed` no Mint. Deixe **Arguments** vazio e clique em **Save**. Confira se o editor abriu o arquivo em foco. Salve uma alteração e confira com **F3**.
 3. Troque o editor em **Options → External editor…** e reabra o Salamander para conferir a persistência. Um executável inexistente deve produzir um aviso.
+
+## Visualizar imagens — F3
+
+Abra a fixture com `python3 tools/qt_smoke_fixture.py --launch` e pressione **F3** em `imagem-teste.png`. Confira as cores e as dimensões, redimensione a janela para testar o ajuste automático, depois marque **Actual size** e use as barras de rolagem. Feche com **Esc** e pressione **F3** em `relatório.txt` para conferir a visualização de texto.
